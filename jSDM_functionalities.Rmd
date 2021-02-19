@@ -1,0 +1,103 @@
+---
+title: "Package `jSDM` functionalities"
+author: "Jeanne Clément"
+date: "`r Sys.Date()`"
+output:
+  pdf_document :
+    latex_engine : xelatex
+    fig_caption : yes
+    pandoc_args: ["--number-sections"]
+header-includes: 
+  - \usepackage{upgreek}
+  - \usepackage{easybmat}
+  - \usepackage{float}
+  - \usepackage{fancyhdr}
+  - \usepackage{hyperref}
+  - \usepackage[frenchb]{babel}
+  - \usepackage{amsmath,amssymb,amsthm}
+  - \usepackage{graphicx}
+  - \usepackage[labelfont=bf,textfont=sl,tableposition=top,small]{caption}
+  - \usepackage{enumitem}
+  - \usepackage{dsfont}
+  - \usepackage{bbm}
+  - \usepackage{answers}
+  - \usepackage{xassoccnt}
+bibliography: bib/biblio-jSDM.bib
+---
+# Abstract
+
+# Results 
+
+## Method validation and benchmark against state-of-the-art jSDMs
+(HMSC, BayesComm, boral, s-jSDM)
+
+### Computational speed
+
+### Accuracy of the inference about species-environment and species-species associations
+comparison of TSS and RMSE obtained with differents libraries 
+
+### Predicting species occurrences
+comparison of AUC obtained with differents libraries
+
+## Case study - Inference of biodiversity maps in Madagascar from forest inventories
+
+### Predictive performance of the model 
+compute AUC on inventory sites 
+
+### Estimated species-species associations
+sjSDM:plotAssociations()
+
+### Estimated species richness on inventory sites
+### Estimated species richness at Madagascar scale
+### Estimated species turn over at Madagascar scale
+
+# Methods
+
+## The structure of the jSDM problem
+
+- Benefits of JSDMs over SDMs
+- models definition (link function : probit, logit, log and data in long format)
+
+## Current approaches to fit the jSDM model structure
+- $\Sigma = \Lambda \Lambda^{\prime}$ @Warton2015
+- inference method : Gibbs sampling using conjugate prior formula (probit link function) or Metropolis-Hastings algorithm (logit and log link function)
+
+## Methods and software to fit joint species distribution models 
+table to compare functionalities of HMSC, s-jSDM, boral (JAGS), greta, gjam, BayesComm, STAN and gllvm
+
+## Benchmarking our method against state-of-the-art jSDM implementation
+- datasets @Wilkinson2019
+- n.mcmc 
+- compute AUC to assess the predictive performance of the models
+
+##  Case study - Inference of biodiversity maps in Madagascar from forest inventories
+### Datasets 
+#### Forest inventory
+#### Current environmental variables
+### Fitting joint species distribution model (JSDM) 
+#### Model definition
+#### Parameters inference
+#### Evaluation of MCMC convergence
+
+### Evaluation of predictive performance
+compute AUC on inventory sites to assess the predictive performance of the model
+
+### Computation of species-species associations
+### Intrapolation of parameters between inventory sites 
+### Species richness computation 
+### Species turn over computation 
+
+# Discussion
+
+## Computational performance
+
+## Inferential performance
+
+## Implications and outlook for ecological data analysis
+
+
+# Acknowledgments
+
+# Data Accessibility
+
+# References
