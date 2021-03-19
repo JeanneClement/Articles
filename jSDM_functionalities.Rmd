@@ -99,7 +99,7 @@ table to compare functionalities of jSDM, HMSC, s-jSDM, boral (JAGS), greta, gja
 
 ### Computation of species-species associations
 
-### Intrapolation of parameters between inventory sites 
+### Interpolation of parameters between inventory sites 
 - GRASS + rgrass7 
 - Regularized splines with tension (RST) @Mitasova1993
 
@@ -107,7 +107,7 @@ table to compare functionalities of jSDM, HMSC, s-jSDM, boral (JAGS), greta, gja
 - use thresholds which maximize TSS to get presence/absence maps from occurence probabilities maps  
 - sum presence/absence maps to get species richness estimation
 
-### Species turn over computation 
+### Species turnover computation 
 - PCA for each pixel of the presence/absence maps (@Allnutt2008)
 - coordinates on the first 3 axes of the PCA reflect the composition of the species community likely to occupy the corresponding pixel
 - coordinates scaled to $[0.255]$ so that they can be represented by red colour levels for the first axis, green for the second and blue for the third
@@ -116,7 +116,8 @@ table to compare functionalities of jSDM, HMSC, s-jSDM, boral (JAGS), greta, gja
 # Results 
 
 ## Method validation and benchmark against state-of-the-art jSDMs
-(HMSC, boral, s-jSDM)
+
+Table comparison HMSC, boral, jSDM on @Wilkinson2019 datasets + birds + mites + aravo (traits) + simulated dataset n.mcmc, compilation time, deviance, predictive performance (TSS or AUC) + RMSE on simulated dataset 
 
 ### Computational speed
 
@@ -137,7 +138,7 @@ comparison of AUC obtained with differents libraries
 
 ### Estimated species richness at Madagascar scale
 
-### Estimated species turn over at Madagascar scale
+### Estimated species turnover at Madagascar scale
 
 # Discussion
 ## Other software comparison
@@ -154,12 +155,12 @@ jSDM advantages :
 
 ## Limitation of jSDM and perspective
 - very large dataset still too long fitting, sjSDM usefull in this case 
-- phylogenie 
-- spatialy explicit models
+- phylogeny
+- spatially explicit models
 - presence only data
 
 ## Implications and outlook for ecological data analysis
-- to predict species distribituions area 
+- to predict species distributions area 
 - to estimate species diversity ($\alpha$), species turnover ($\beta$) or other diversity indices
 - to predict the evolution of biodiversity under climate change
 - to identify refuge zone of biodiversity 
