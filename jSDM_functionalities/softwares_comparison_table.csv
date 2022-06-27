@@ -1,0 +1,38 @@
+Softwares;jSDM;Hmsc;boral;sjSDM;gjam;BayesComm;gllvm;PyMC3, greta, JAGS, Stan
+Model name;Joint species Distribution Models;Hierarchical Modeling of Species Communities;Bayesian Ordination and Regression Analysis;Scalable Joint species Distribution Models;Generalized Joint Attribute modeling;Bayesian community ecology Analysis;Generalized Linear Latent Variable Models;Probabilistic programming
+Statistical inference framework;Gibbs sampler;Gibbs sampler ;Gibbs sampler (JAGS);Maximum Likelihood Estimate (MLE) MC approximation;Gibbs sampler;Gibbs sampler;Laplace or variational approximation ;Hamiltonian MC Except for JAGS Gibbs sampler 
+Probabilistic programming;0;0;0;0;0;0;0;1
+CPU;1;1;1;1;1;1;1;1
+GPU;0;0;0;1;0;0;0;1 (PyMC3, greta)
+Language;C++/R;R;R/C++;Python/R;R/C++;R/C++;R;Python, R/C++, C++, C++
+Data format;wide, long;wide;wide;wide;wide;wide;wide, long;wide, long
+Presence-absence ;1;1;1;1;1;1;1;1
+Count;1;1;1;1;1;0;1;1
+Missing data ;1;0;0;0;1;0;0;0
+Presence only;0;0;0;0;1;0;0;0
+Bernoulli (probit);1;1;1;1;0;1;1;1
+Bernoulli (logit);1;0;0;1;0;0;1;1
+Binomial( probit);0;0;1;0;0;0;0;1
+Binomial (logit);1;0;0;0;0;0;0;1
+Poisson (log);1;1;1;1;0;0;1;1
+Neg.Bin (log);0;0;1;0;0;0;1;1
+Normal (identity);0;1;1;1;1;0;1;1
+None;1;1;1;1;0;1;1;1
+Fixed;1;0;1;0;0;0;1;1
+Random;1;1;1;0;1;0;1;1
+Fixed;1;0;1;1;1;1;1;1
+Random;0;1;0;0;1;0;1;1
+Species traits ;1;1;1;0;1;0;1;1
+Spatial variation ;0;1;1;1;0;0;1;1
+LVM;1;1;1;0;1 f large data-set, \ \ \ 0 otherwise;0;1;1
+Fixed;1;0;1;0;0;0;0;1
+Random;0;1;0;0;1;0;1;1
+Constraint choice;1;0;0;0;0;0;0;1
+Fixed;1;1;1;0;1;0;1;1
+Estimated;0;1;0;0;0;0;0;1
+Examples;1;1;1;1;1;1;1;1
+Vignettes;1;1;0;1;1;0;1;1
+Predict ;1;1;1;1;1;1;1;0
+Residual correlation;1;1;1;1;1;1;1;0
+Reference;;;;;;;;
+URL ;;;;;;;;

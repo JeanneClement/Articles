@@ -1,0 +1,3120 @@
+---
+title: "Comparison jSDM-boral-Hmsc"
+output:
+  bookdown::html_document2:
+    #base_format: rmarkdown::html_vignette
+    highlight: tango
+    number_sections: true
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    fig_caption: yes
+link-citations: yes
+bibliography: bib/biblio-jSDM.bib
+biblio-style: bib/jae.bst
+csl: bib/journal-of-applied-ecology.csl
+pkgdown:
+  as_is: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  fig.align="center",
+  fig.width=8, fig.height=6,
+  cache=TRUE,
+  collapse=TRUE,
+  comment="#>",
+  highlight=TRUE,
+  eval=FALSE
+)
+```
+
+# Models definition 
+
+## Binomial models for presence-absence data
+
+We consider a latent variable model (LVM) to account for species co-occurrence [@Warton2015] on all sites . 
+
+$$y_{ij} \sim \mathcal{B}iniomial(n_i, \theta_{ij})$$
+  
+  $$ \mathrm{g}(\theta_{ij}) = X_i\beta_j + W_i\lambda_j $$
+- $\theta_{ij}$: occurrence probability of the species $j$ on site $i$. 
+- $\mathrm{g}(\cdot)$: Link function (eg. logit or probit).
+- $n_i$: number of visits at site $i$. The inference method is able to handle only one visit by site with a **probit** link function so $\forall i, \ n_i=1$ and $y_{ij} \sim \mathcal{B}ernoulli(\theta_{ij})$.
+
+- $y_{ij}$: response variable for site $i$ and species $j$ (presence/absence data), with $Y=(y_{ij})^{i=1,\ldots,I}_{j=1,\ldots,J}$. 
+
+- $X_i$: Vector of explanatory variables for site $i$, with $X_i=(x_{i0},x_{i1},\ldots,x_{ip})\in \mathbb{R}^{p+1}$, where $p$ is the number of bioclimatic or environmental variables considered for each site and $for all i, x_{i0}=1$.
+
+- $T_j$: Vector of traits for species $j$ can also be considered, with $T_j=(t_{j0},t_{j1},\ldots,t_{jn})\in \mathbb{R}^n$ where $n$ is the number of species traits considered and $\forall j, t_{j0}=1$.
+ 
+- $\beta_j$: Effects of the explanatory variables on the probability of presence of species $j$ including species intercept ($\beta_{j0}$). 
+  - In the absence of species trait data, the species effects $\beta_j$; follow the same *a priori* Gaussian distribution for each species $j$ such as: $\beta_j \sim \mathcal{N}_{p+1}(\mu_{\beta},\Sigma_{\beta})$ with              $\mu_{\beta}=0_{\mathbb{R}^{p+1}}$ and $\Sigma_{\beta}$ is a diagonal matrix of size $p \times p$ whose values on the diagonal are fixed at $1$ in `jSDM` package, and $\beta_{jk} \sim \mathcal{N}(0,1)$ for `boral`.
+  - If species trait data are provided, the effect of species $j$: $\beta_j$; follows a Gaussian distribution *a priori* such that : $\beta_j \sim \mathcal{N}_{p+1}(\mu_{\beta_j},\Sigma_{\beta})$, where $\mu_{\beta_{jk}} = \sum_{r=0}^{n} t_{jr}.\gamma_{rk}$ for $k=0,\ldots,p$, takes different values for each species and $\Sigma_{\beta}$ is a diagonal matrix of size $p \times p$ whose values on the diagonal are fixed at $10$ in `jSDM` package. For `boral`, $\beta_{jk} \sim \mathcal{N}(\mu_{\beta_{jk}},V_{\beta_k})$ where $\mu_{\beta_{jk}}$ is defined as above and $V_{\beta_k} \sim \mathcal{U}(0,10)$. In this case we suppose that $\gamma_{rk} \sim \mathcal{N}(0,1)$ as an *a priori* distribution for both packages.  
+
+- $W_i$: Vector of random latent variables for site $i$. $W_i \sim N(0, 1)$. The number of latent variables $q$ must be fixed by the user (default to $q=2$). 
+
+- $\lambda_j$: Effects of the latent variables on the probability of presence of species $j$ also known as "factor loadings" [@Warton2015]. We use the following prior distribution in both packages to constraint values to $0$ on upper diagonal and to strictly positive values on diagonal, for $j=1,\ldots,J$ and $l=1,\ldots,q$ : $$\lambda_{jl} \sim \begin{cases}
+\mathcal{N}(0,1) & \text{if } l < j \\
+\mathcal{N}(0,1) \text{ left truncated by } 0 & \text{if } l=j \\
+P \text{ such as } \mathbb{P}(\lambda_{jl} = 0)=1  & \text{if } l>j
+\end{cases}$$.  
+
+This model is equivalent to a multivariate GLMM $\mathrm{g}(\theta_{ij}) =\alpha_i + X_i.\beta_j + u_{ij}$, where $u_{ij} \sim \mathcal{N}(0, \Sigma)$ with the constraint that the variance-correlation matrix $\Sigma = \Lambda \Lambda^{\prime}$, where $\Lambda$ is the full matrix of factor loadings, with the $\lambda_j$ as its columns. 
+
+The prior distributions used by default for each parameter in package `Hmsc` are specified in the article @Ovaskainen2017. 
+
+## Poisson model for abundance data
+
+Referring to the models used in the articles [@Hui2016], we define the following model to account for species abundances on all sites. 
+
+$$y_{ij} \sim \mathcal{P}oisson(\theta_{ij})$$. 
+
+$$ \mathrm{log}(\theta_{ij}) =  X_i\beta_j + W_i\lambda_j $$
+## Residual correlation matrix 
+
+Using this models we can compute the **full species residual correlation matrix** $R=(R_{ij})^{i=1,\ldots, nsp}_{j=1,\ldots, nsp}$ from the covariance in the latent variables such as : 
+ $$\Sigma_{ij} = \lambda_i .\lambda_j^T $$, then we compute correlations from co-variances :
+  $$R_{i,j} = \frac{\Sigma_{ij}}{\sqrt{\Sigma _{ii}\Sigma _{jj}}}$$.
+  
+# Data-sets
+
+## Data simulation 
+
+We start by simulating the data-set that we will then analyze among other real data-sets.  
+
+We generate a data-set following the previous model with $300$ sites, $100$ species and as parameters :
+
+```{r simulated-data, echo=TRUE, eval=FALSE}
+#==================
+#== Data simulation
+#==================
+#= Number of species
+nsp <- 100
+#= Number of sites
+nsite <- 300
+#= Number of latent variables
+nl <- 2
+#= Set seed for repeatability
+seed <- 123
+set.seed(seed)
+
+# Ecological process (suitability)
+x1 <- rnorm(nsite, 0, 1)
+x2 <- rnorm(nsite, 0, 1)
+X <- cbind(rep(1, nsite), x1, x2)
+np <- ncol(X)
+#= Latent variables W
+W <- matrix(rnorm(nsite*nl, 0, 1), nrow=nsite, ncol=nl)
+#= Fixed species effect beta 
+beta.target <- t(matrix(runif(nsp*np, -1, 1), byrow=TRUE, nrow=nsp))
+#= Factor loading lambda  
+mat <- t(matrix(runif(nsp*nl, -1, 1),  byrow=TRUE, nrow=nsp))
+diag(mat) <- runif(nl, 0, 1)
+lambda.target <- matrix(0, nl, nsp)
+lambda.target[upper.tri(mat, diag=TRUE)] <- mat[upper.tri(mat,  diag=TRUE)]
+
+# Simulation of response data with probit link
+probit_theta <- X %*% beta.target + W %*% lambda.target 
+theta <- pnorm(probit_theta)
+e <- matrix(rnorm(nsp*nsite, 0, 1), nsite, nsp)
+# Latent variable Z 
+Z_true <- probit_theta + e
+# Presence-absence matrix Y
+Y <- matrix (NA, nsite, nsp)
+for (i in 1:nsite){
+  for (j in 1:nsp){
+    if ( Z_true[i, j] > 0) {Y[i, j] <- 1}
+    else {Y[i, j] <- 0}
+  }
+}
+```
+
+## Data-sets description 
+
+Among the following data-sets, the presence-absence data are from the [@Wilkinson2019] article in which they are used to compare joint species distribution models for presence-absence data, the data-set that records the abundance of alpine plants (`aravo`) from the [@Choler2005] article and the `mites` abundance data-set is from the [@Borcard1994] article.
+
+```{r data-sets, echo=TRUE, eval=TRUE}
+library(knitr)
+library(kableExtra)
+library(jSDM)
+library(boral)
+library(Hmsc)
+# Mosquitos data-set
+data("mosquitos")
+PA_Mosquitos <- mosquitos[, 1:16]
+Env_Mosquitos <- mosquitos[, 17:29]
+mf.suit <- model.frame(formula=~., data=as.data.frame(Env_Mosquitos))
+X_Mosquitos <- model.matrix(attr(mf.suit, "terms"),  data=mf.suit)
+# Eucalypts data-set
+data("eucalypts")
+PA_Eucalypts <- eucalypts[, 1:12]
+Env_Eucalypts <- cbind(scale(eucalypts[, c("Rockiness", "VallyBotFlat", "PPTann",  "cvTemp", "T0")]), eucalypts[, c("Sandiness", "Loaminess")])
+Env_Eucalypts <- Env_Eucalypts[rowSums(PA_Eucalypts) != 0, ]
+# Remove sites where none species was recorded
+PA_Eucalypts<- PA_Eucalypts[rowSums(PA_Eucalypts) != 0, ]
+mf.suit <- model.frame(formula=~.,  data=as.data.frame(Env_Eucalypts))
+X_Eucalypts <- model.matrix(attr(mf.suit, "terms"),  data=mf.suit)
+# Frogs data-set
+data("frogs")
+PA_Frogs <- frogs[, 4:12]
+Env_Frogs <- cbind(scale(frogs[, "Covariate_1"]), frogs[, "Covariate_2"], scale(frogs[, "Covariate_3"]))
+mf.suit <- model.frame(formula=~.,  data=as.data.frame(Env_Frogs))
+X_Frogs <- model.matrix(attr(mf.suit, "terms"),  data=mf.suit)
+# Fungi data-set
+data(fungi,  package="jSDM")
+Env_Fungi <- cbind(scale(fungi[, c("diam", "epi", "bark")]), 
+                   fungi[, c("dc1", "dc2", "dc3", "dc4", 
+                            "quality3", "quality4", "ground3", "ground4")])
+colnames(Env_Fungi) <- c("diam", "epi", "bark", "dc1", "dc2", "dc3", "dc4",
+                         "quality3", "quality4", "ground3", "ground4")
+PA_Fungi <- fungi[, c("antser", "antsin", "astfer", "fompin", "hetpar", "junlut", 
+                     "phefer", "phenig", "phevit", "poscae", "triabi")]
+Env_Fungi <- Env_Fungi[rowSums(PA_Fungi) != 0, ]
+# Remove sites where none species was recorded
+PA_Fungi <- PA_Fungi[rowSums(PA_Fungi) != 0, ]
+mf.suit <- model.frame(formula=~.,  data=as.data.frame(Env_Fungi))
+X_Fungi <- model.matrix(attr(mf.suit, "terms"),  data=mf.suit)
+# Aravo data-set
+data("aravo")
+PA_Aravo <- aravo$spe
+# Remove species with less than 5 presences
+rare_sp <- which(apply(PA_Aravo>0, 2, sum) < 5) 
+PA_Aravo <- PA_Aravo[, -rare_sp]
+# As a first approach, we just select the "Snow" variable
+# considering a quadratic orthogonal polynomial.
+p <- poly(aravo$env$Snow, 2)
+Env_Aravo <- data.frame(p)
+names(Env_Aravo) <- c("snow", "snow2")
+X_Aravo <- data.frame(cbind(1, p))
+names(X_Aravo) <- c("int", "snow", "snow2")
+# Specific leaf area (SLA) normalized
+Tr_Aravo <- data.frame(SLA=scale(aravo$traits[-rare_sp, "SLA"]))
+# Mites data-set
+data("mites")
+PA_Mites <- mites[,1:35]
+# Remove species with less than 10 presences
+rare_sp <- which(apply(PA_Mites >0, 2, sum) < 10) 
+PA_Mites <- PA_Mites[, -rare_sp]
+# Normalized continuous variables
+Env_Mites  <- cbind(scale(mites[,c("density","water")]), mites[,c("substrate", "shrubs", "topo")])
+mf.suit <- model.frame(formula=~., data=as.data.frame(Env_Mites))
+X_Mites <- model.matrix(attr(mf.suit,"terms"), data=mf.suit)
+
+## Data-sets overview
+datasets <- data.frame(matrix(NA,10,7), row.names=c("data type", "distribution", "n.sites","n.species","n.latent","n.col.X", "n.traits", "n.obs", "n.param", ""))
+colnames(datasets) <- c("Simulated", "Mosquitos", "Eucalypts", "Frogs", "Fungi", "Aravo", "Mites") 
+datasets["n.sites", ] <- c(300, nrow(mosquitos), nrow(Env_Eucalypts), nrow(frogs), nrow(Env_Fungi),  nrow(PA_Aravo), nrow(mites))
+datasets["n.col.X", ] <- c(3, ncol(X_Mosquitos), ncol(X_Eucalypts), ncol(X_Frogs), ncol(X_Fungi), ncol(X_Aravo),  ncol(X_Mites))
+datasets["n.species", ] <- c(100, ncol(PA_Mosquitos), ncol(PA_Eucalypts), ncol(PA_Frogs), ncol(PA_Fungi), ncol(PA_Aravo), ncol(PA_Mites))
+datasets["n.traits", ] <- c(0, 0, 0, 0, 0, ncol(Tr_Aravo), 0)
+datasets["n.latent", ] <- 2
+datasets["n.obs", ] <- datasets["n.sites", ]*datasets["n.species", ] 
+datasets["n.param", ] <- datasets["n.sites", ]*(1 + datasets["n.latent", ]) + 1+ datasets["n.species", ]*(datasets["n.col.X", ] + datasets["n.latent", ]) - 1
+# all interactions traits environment are considered
+datasets["n.param", "Aravo"] <- datasets["n.param", "Aravo"] + datasets["n.col.X", "Aravo"]*(datasets["n.traits", "Aravo"] + 1)
+datasets["data type", ] <-c("presence-absence", "presence-absence", "presence-absence", "presence-absence", "presence-absence", "abundance", "abundance")
+datasets["distribution",] <- c("bernoulli", "bernoulli", "bernoulli", "bernoulli", "bernoulli", "poisson", "poisson")
+sp_pictures <- c("figures/des.jpg",
+                 "figures/Mosquitos.jpg","figures/Eucalyptus.jpg",
+                 "figures/Frogs.jpg","figures/Fungi.jpg",
+                 "figures/alpine_plants_.jpg",
+                 "figures/oribatid_mites_.png")
+datasets["",] <- sprintf('![](%s){height="80px" width="80px"}', sp_pictures)
+knitr::kable(datasets, booktabs=TRUE, align='c') %>%
+  column_spec(1, bold=TRUE) %>%
+  kableExtra::kable_styling(latex_options=c("HOLD_position", "striped"), full_width=FALSE)
+```
+
+# Package `boral`
+
+In the article [@Warton2015] the fitting of joint species distributions models is performed using the package `boral` which runs with `JAGS` (Just Another Gibbs Sampler) a simulation program from hierarchical Bayesian models using MCMC methods implemented in C++. 
+This package and the package `jSDM` allow to fit the model defined previously, so we can compare the results obtained by each of them on different data-sets. 
+
+In a first step, we fit joint species distribution models from previous data-sets using the `boral()` function from package of the same name whose features are developed in the article [@Hui2016]. 
+
+## Simulated dataset
+
+We fit a binomial joint species distribution model, including latent variables, from the simulated data-set using the `boral()` function to perform binomial probit regression.
+
+```{r boral-simulation, eval=FALSE}
+setwd(paste0(dirname(rstudioapi::getSourceEditorContext()$path),"/jSDM_boral_Hmsc_cache"))
+library(boral)
+T1<-Sys.time() 
+mod_boral_sim <- boral(y=Y, X=X[,-1], lv.control=list(num.lv=nl),
+                       family="binomial", row.eff="none",
+                       prior.control = list(type = c("normal","normal","normal","uniform"),
+                                            hypparams = c(1, 1, 1, 10)),
+                       save.model=TRUE,
+                       model.name="sim_jagsboralmodel.txt", 
+                       mcmc.control=list(n.burnin=10000, n.iteration=20000,
+                                         n.thin=10, seed=123))
+T2<-Sys.time() 
+T_boral_sim=difftime(T2, T1, units="secs")
+
+# Predicted probit(theta) 
+boral_probit_theta_latent_sim <- X[,-1] %*% t(mod_boral_sim$X.coefs.mean) + 
+  matrix(mod_boral_sim$lv.coefs.mean[,"beta0"],nrow=nsite,ncol=nsp,byrow=TRUE) +
+  mod_boral_sim$lv.mean%*%t(mod_boral_sim$lv.coefs.mean[,-1])
+
+boral_theta_latent_sim <- pnorm(boral_probit_theta_latent_sim)
+
+# RMSE
+SE=(pnorm(probit_theta)-boral_theta_latent_sim)^2
+RMSE_boral_sim=sqrt(sum(SE/(nsite*nsp)))
+# Deviance 
+logL=0
+for (i in 1:nsite){
+  for (j in 1:nsp){
+    logL=logL + dbinom(Y[i,j],1, boral_theta_latent_sim[i,j],1)  
+  }
+}
+Deviance_boral_sim <- -2*logL
+
+save(np, nl, nsp, nsite, beta.target, lambda.target, 
+     X, W, probit_theta, Z_true, Y, T_boral_sim,
+     mod_boral_sim, boral_probit_theta_latent_sim, 
+     boral_theta_latent_sim, 
+     RMSE_boral_sim, Deviance_boral_sim,
+     file="boral_simulation.RData")
+```
+
+We visually evaluate the convergence of MCMCs by representing the trace and density *a posteriori* of some estimated parameters using the `boral` package and we plot the estimated parameters according to the expected ones to assess the accuracy of the package `boral` results.
+
+```{r boral-simulation-plot}
+
+load(file="jSDM_boral_Hmsc_cache/boral_simulation.RData")
+mcmcsamps <- boral::get.mcmcsamples(mod_boral_sim)
+boral_mcmc_beta0 <- mcmcsamps[,grep("lv.coefs\\[[1-9][0-9]?[0-9]?,1\\]", colnames(mcmcsamps))]
+colnames(boral_mcmc_beta0) <- gsub(",1\\]",",0\\]",
+                                   gsub("lv.coefs", "X.coefs",
+                                        colnames(boral_mcmc_beta0)))
+boral_mcmc_beta <- cbind(boral_mcmc_beta0,
+                         mcmcsamps[,grep("X.coefs", colnames(mcmcsamps))])
+boral_mcmc_lambda <- mcmcsamps[, grep("lv.coefs\\[[1-9][0-9]?[0-9]?,1\\]",
+                                           grep("lv.coefs", colnames(mcmcsamps),
+                                                value=TRUE), invert=TRUE, value=TRUE)]
+
+## Fixed species effect beta for first two species 
+np <- ncol(X)
+par(mfrow=c(ncol(X),2))
+for (j in 1:2) {
+  for (p in 1:ncol(X)) {
+    coda::traceplot(coda::as.mcmc(boral_mcmc_beta[,j + nsp*(p-1)]))
+    coda::densplot(coda::as.mcmc(boral_mcmc_beta[,j + nsp*(p-1)]), 
+                   main=colnames(boral_mcmc_beta)[j + nsp*(p-1)])
+    abline(v=beta.target[p,j],col='red')
+  }
+}
+
+## Factor loadings lambda for first two species 
+par(mfrow=c(nl,2))
+for (j in 1:2) {
+  for (l in 1:nl) {
+    coda::traceplot(coda::as.mcmc(boral_mcmc_lambda[,j + nsp*(l-1)]))
+    coda::densplot(coda::as.mcmc(boral_mcmc_lambda[,j + nsp*(l-1)]), 
+                   main=colnames(boral_mcmc_lambda)[j + nsp*(l-1)])
+    abline(v=lambda.target[l,j],col='red')
+  }
+}
+## Fixed species effect beta
+par(mfrow=c(1,2))
+plot(t(beta.target),
+     cbind(mod_boral_sim$lv.coefs.mean[,1],mod_boral_sim$X.coefs.mean),
+     xlab="obs", ylab="fitted", main="Fixed species effect beta") 
+abline(a=0,b=1,col='red')
+## factor loadings lambda_j
+plot(t(lambda.target),mod_boral_sim$lv.coefs.mean[,-1],
+     xlab="obs", ylab="fitted", main="Loading factors lambda") 
+abline(a=0,b=1,col='red')
+## Latent variable W 
+
+for (l in 1:nl) {
+  plot(W[,l],mod_boral_sim$lv.mean[,l],
+       main=paste0("Latent variable W_", l),
+       xlab="obs", ylab="fitted")
+  abline(a=0,b=1,col='red')
+}
+
+## Prediction
+# probit_theta_latent 
+plot(probit_theta, boral_probit_theta_latent_sim,
+     main="probit(theta)", xlab ="obs", ylab="fitted")
+abline(a=0,b=1,col='red')
+# theta_latent
+plot(pnorm(probit_theta), pnorm(boral_probit_theta_latent_sim),
+     main="theta", xlab ="obs", ylab="fitted")
+abline(a=0,b=1,col='red')
+```
+
+
+```{r boral-simulation-plot2, echo=FALSE, out.width=800, eval=TRUE}
+knitr::include_graphics(paste0("jSDM_boral_Hmsc_files/figure-html/boral-simulation-plot-", 1:7, ".png"))
+```
+
+Overall, the traces and the densities of the parameters indicate the convergence of the algorithm. Indeed, we observe on the traces that the values oscillate around averages without showing an upward or downward trend and we see that the densities are quite smooth and for the most part of Gaussian form.  
+On the above figures, the estimated parameters are close to the expected values if the points are near the red line representing the identity function ($y=x$). 
+
+## Mosquitos dataset
+
+We fit a binomial joint species distribution model, including latent variables, from the [`mosquitos`](https://ecology.ghislainv.fr/jSDM/reference/mosquitos.html) data-set using `boral()` function to perform binomial probit regression.
+
+```{r boral-mosquito, eval=FALSE}
+setwd(paste0(dirname(rstudioapi::getSourceEditorContext()$path),"/jSDM_boral_Hmsc_cache"))
+# Import center and reduce Mosquito data-set
+data(mosquitos, package="jSDM")
+head(mosquitos)
+Env_Mosquitos <- mosquitos[,17:29]
+Env_Mosquitos <- cbind(scale(Env_Mosquitos[,1:4]), Env_Mosquitos[,5:13])
+PA_Mosquitos <- mosquitos[,1:16]
+
+# Fit the model 
+T1 <- Sys.time()
+mod_boral_Mosquitos <- boral(y=PA_Mosquitos, X=Env_Mosquitos,
+                             save.model=TRUE, model.name="Mosquitos_jagsboralmodel.txt", 
+                             lv.control=list(num.lv=2), family="binomial",
+                             prior.control = list(type=c("normal","normal",
+                                                         "normal","uniform"),
+                                            hypparams = c(1, 1, 1, 10)),
+                             row.eff="none",
+                             mcmc.control=list(n.burnin=10000, n.iteration=20000,
+                                               n.thin=10,seed=123))
+T2 <- Sys.time()
+T_boral_Mosquitos <- difftime(T2, T1, units="secs")
+
+# Predicted probit(theta) 
+boral_probit_theta_latent_Mosquitos <- as.matrix(Env_Mosquitos) %*% t(mod_boral_Mosquitos$X.coefs.mean) +
+  matrix(1,nrow=nrow(PA_Mosquitos), ncol=1)%*%mod_boral_Mosquitos$lv.coefs.mean[,"beta0"] + 
+  mod_boral_Mosquitos$lv.mean%*% t(mod_boral_Mosquitos$lv.coefs.mean[,-1])
+# theta_latent
+boral_theta_latent_Mosquitos <- pnorm(boral_probit_theta_latent_Mosquitos)
+# Deviance
+logL=0
+for (i in 1:nrow(PA_Mosquitos)){
+  for (j in 1:ncol(PA_Mosquitos)){
+    logL=logL + dbinom(PA_Mosquitos[i,j], 1, boral_theta_latent_Mosquitos[i,j],1)  
+  }
+}
+Deviance_boral_Mosquitos <- -2*logL
+
+save(T_boral_Mosquitos, mod_boral_Mosquitos, boral_theta_latent_Mosquitos,
+     boral_probit_theta_latent_Mosquitos, Deviance_boral_Mosquitos,
+     file="boral_Mosquitos.RData")
+```
+
+
+## Eucalypts dataset
+
+We fit a binomial joint species distribution model, including latent variables, from the [`eucalypts`](https://ecology.ghislainv.fr/jSDM/reference/eucalypts.html) data-set using `boral()` function to perform binomial probit regression.
+
+```{r boral-eucalypts, eval=FALSE}
+# Import center and reduce Eucalypts data-set
+data(eucalypts, package="jSDM")
+head(eucalypts)
+Env_Eucalypts <- cbind(scale(eucalypts[,c("Rockiness","VallyBotFlat","PPTann", "cvTemp","T0")]),eucalypts[,c("Sandiness","Loaminess")])
+PA_Eucalypts <- eucalypts[,1:12]
+Env_Eucalypts <- Env_Eucalypts[rowSums(PA_Eucalypts) != 0,]
+# Remove sites where none species was recorded
+PA_Eucalypts <- PA_Eucalypts[rowSums(PA_Eucalypts) != 0,]
+
+# Fit the model 
+T1 <- Sys.time()
+mod_boral_Eucalypts <- boral(y=PA_Eucalypts, X=Env_Eucalypts,
+                             save.model=TRUE, model.name="Eucalypts_jagsboralmodel.txt",
+                             lv.control=list(num.lv=2), family="binomial",
+                             prior.control=list(type=c("normal","normal",
+                                                       "normal","uniform"),
+                                                hypparams = c(1, 1, 1, 10)),
+                             row.eff="none",
+                             mcmc.control=list(n.burnin=10000,
+                                               n.iteration=20000,
+                                               n.thin=10, seed=123))
+T2 <- Sys.time()
+T_boral_Eucalypts <- difftime(T2, T1, units="secs")
+
+# Predicted probit(theta) 
+boral_probit_theta_latent_Eucalypts <- as.matrix(Env_Eucalypts) %*% t(mod_boral_Eucalypts$X.coefs.mean) + 
+  matrix(1,nrow=nrow(PA_Eucalypts),ncol=1)%*%mod_boral_Eucalypts$lv.coefs.mean[,"beta0"] + 
+  mod_boral_Eucalypts$lv.mean%*%t(mod_boral_Eucalypts$lv.coefs.mean[,-1])
+# theta_latent
+boral_theta_latent_Eucalypts <- pnorm(boral_probit_theta_latent_Eucalypts)
+# Deviance
+logL=0
+for (i in 1:nrow(PA_Eucalypts)){
+  for (j in 1:ncol(PA_Eucalypts)){
+    logL=logL + dbinom(PA_Eucalypts[i,j],1,
+                       boral_theta_latent_Eucalypts[i,j],1)  
+  }
+}
+Deviance_boral_Eucalypts <- -2*logL
+
+save(T_boral_Eucalypts, mod_boral_Eucalypts, boral_theta_latent_Eucalypts,
+     boral_probit_theta_latent_Eucalypts, Deviance_boral_Eucalypts,
+     file="boral_Eucalypts.RData")
+```
+
+## Frogs dataset
+
+We fit a binomial joint species distribution model, including latent variables, from the [`frogs`](https://ecology.ghislainv.fr/jSDM/reference/frogs.html) data-set using `boral()` function to perform binomial probit regression.
+
+```{r boral-frogs, eval=FALSE}
+# Import center and reduce Frogs data-set
+data(frogs, package="jSDM")
+head(frogs)
+Env_Frogs <- cbind(scale(frogs[,"Covariate_1"]),frogs[,"Covariate_2"],
+                   scale(frogs[,"Covariate_3"]))
+colnames(Env_Frogs) <- colnames(frogs[,1:3])
+PA_Frogs <- frogs[,4:12]
+
+# Fit the model
+T1 <- Sys.time()
+mod_boral_Frogs <- boral(y=PA_Frogs, X=Env_Frogs,
+                         save.model=TRUE, model.name="Frogs_jagsboralmodel.txt",
+                         lv.control=list(num.lv=2), family="binomial",
+                         prior.control=list(type=c("normal","normal",
+                                                   "normal","uniform"),
+                                            hypparams = c(1, 1, 1, 10)),
+                         row.eff="none",
+                         mcmc.control=list(n.burnin=10000,
+                                           n.iteration=20000,
+                                           n.thin=10, seed=123))
+T2 <- Sys.time()
+T_boral_Frogs <- difftime(T2, T1, units="secs")
+
+# Predicted probit(theta) 
+boral_probit_theta_latent_Frogs <- as.matrix(Env_Frogs) %*% t(mod_boral_Frogs$X.coefs.mean) +
+  matrix(1,nrow=nrow(PA_Frogs), ncol=1)%*%mod_boral_Frogs$lv.coefs.mean[,"beta0"] + 
+  mod_boral_Frogs$lv.mean%*%t(mod_boral_Frogs$lv.coefs.mean[,-1])
+# theta_latent
+boral_theta_latent_Frogs <- pnorm(boral_probit_theta_latent_Frogs)
+# Deviance
+logL=0
+for (i in 1:nrow(PA_Frogs)){
+  for (j in 1:ncol(PA_Frogs)){
+    logL=logL + dbinom(PA_Frogs[i,j], 1,
+                       boral_theta_latent_Frogs[i,j], 1)  
+  }
+}
+Deviance_boral_Frogs <- -2*logL
+
+save(T_boral_Frogs, mod_boral_Frogs, boral_theta_latent_Frogs,
+     boral_probit_theta_latent_Frogs, Deviance_boral_Frogs,
+     file="boral_Frogs.RData")
+```
+
+## Fungi dataset
+
+We fit a binomial joint species distribution model, including latent variables, from the [`fungi`](https://ecology.ghislainv.fr/jSDM/reference/fungi.html) data-set using `boral()` function to perform binomial probit regression.
+
+```{r boral-fungi, eval=FALSE}
+# Import center and reduce fungi data-set
+data(fungi, package="jSDM")
+Env_Fungi <- cbind(scale(fungi[,c("diam","epi","bark")]),
+                   fungi[,c("dc1","dc2","dc3","dc4",
+                            "quality3","quality4","ground3","ground4")])
+colnames(Env_Fungi) <- c("diam","epi","bark","dc1","dc2","dc3","dc4",
+                         "quality3","quality4","ground3","ground4")
+PA_Fungi <- fungi[,c("antser","antsin","astfer","fompin","hetpar","junlut",
+                     "phefer","phenig","phevit","poscae","triabi")]
+Env_Fungi <- Env_Fungi[rowSums(PA_Fungi) != 0,]
+# Remove sites where none species was recorded
+PA_Fungi<- PA_Fungi[rowSums(PA_Fungi) != 0,]
+
+# Fit the model 
+T1 <- Sys.time()
+mod_boral_Fungi <- boral(y=PA_Fungi, X=Env_Fungi,
+                         save.model=TRUE, model.name="Fungi_jagsboralmodel.txt",
+                         lv.control=list(num.lv=2), family="binomial",
+                         prior.control=list(type=c("normal","normal",
+                                                   "normal","uniform"),
+                                            hypparams = c(1, 1, 1, 10)),
+                         row.eff="none",
+                         mcmc.control=list(n.burnin=10000,
+                                           n.iteration=20000,
+                                           n.thin=10, seed=123))
+T2 <- Sys.time()
+T_boral_Fungi <- difftime(T2, T1, units="secs")
+
+# Predicted probit(theta) 
+boral_probit_theta_latent_Fungi <- as.matrix(Env_Fungi) %*% t(mod_boral_Fungi$X.coefs.mean) + 
+  matrix(1,nrow=nrow(PA_Fungi), ncol=1)%*%mod_boral_Fungi$lv.coefs.mean[,"beta0"] + 
+  mod_boral_Fungi$lv.mean%*%t(mod_boral_Fungi$lv.coefs.mean[,-1])
+# theta_latent
+boral_theta_latent_Fungi <- pnorm(boral_probit_theta_latent_Fungi)
+# Deviance
+logL=0
+for (i in 1:nrow(PA_Fungi)){
+  for (j in 1:ncol(PA_Fungi)){
+    logL=logL + dbinom(PA_Fungi[i,j], 1,
+                       boral_theta_latent_Fungi[i,j], 1)  
+  }
+}
+Deviance_boral_Fungi <- -2*logL
+
+save(T_boral_Fungi, mod_boral_Fungi, boral_theta_latent_Fungi,
+     boral_probit_theta_latent_Fungi, Deviance_boral_Fungi,
+     file="boral_Fungi.RData")
+```
+
+## Aravo dataset
+
+We fit a binomial joint species distribution model including latent variables, from the [`aravo`](https://ecology.ghislainv.fr/jSDM/reference/aravo.html) data-set using `boral()` function to perform poisson log-linear regression.
+
+```{r boral-aravo, eval=FALSE}
+# Import aravo data-set
+data(aravo, package="jSDM")
+# data.obs
+PA_Aravo <- aravo$spe
+# Remove species with less than 5 presences
+rare_sp <- which(apply(PA_Aravo>0, 2, sum) < 5) 
+PA_Aravo <- PA_Aravo[, -rare_sp]
+# Only snow variable considering a quadratic orthogonal polynomial.
+# Normalized continuous variables
+p <- poly(aravo$env$Snow, 2)
+Env_Aravo <- data.frame(p)
+names(Env_Aravo) <- c("snow", "snow2")
+# Normalized continuous species traits
+Tr_Aravo <- data.frame(SLA=scale(aravo$traits[-rare_sp, "SLA"]))
+
+# Fit the model 
+which.traits <- list()
+which.traits[[1]] <- c(1)
+which.traits[[2]] <- c(1)
+which.traits[[3]] <- c(1)
+T1 <- Sys.time()
+mod_boral_Aravo <- boral(y=PA_Aravo, X=Env_Aravo, traits=Tr_Aravo,
+                         which.traits=which.traits,
+                         save.model=TRUE, model.name="Aravo_jagsboralmodel.txt",
+                         lv.control=list(num.lv=2), family="poisson",
+                         prior.control=list(type=c("normal","normal",
+                                                   "normal","uniform"),
+                                            hypparams = c(1, 1, 1, 10)),
+                         row.eff="none",
+                         mcmc.control=list(n.burnin=10000,
+                                           n.iteration=20000,
+                                           n.thin=10, seed=123))
+T2 <- Sys.time()
+T_boral_Aravo <- difftime(T2, T1, units="secs")
+
+# Predicted probit(theta) 
+boral_log_theta_latent_Aravo <- as.matrix(Env_Aravo) %*% t(mod_boral_Aravo$X.coefs.mean) + 
+  matrix(1,nrow=nrow(PA_Aravo), ncol=1)%*%mod_boral_Aravo$lv.coefs.mean[,"beta0"] + 
+  mod_boral_Aravo$lv.mean%*%t(mod_boral_Aravo$lv.coefs.mean[,-1])
+# theta_latent
+boral_theta_latent_Aravo <- exp(boral_log_theta_latent_Aravo)
+# Deviance
+logL=0
+for (i in 1:nrow(PA_Aravo)){
+  for (j in 1:ncol(PA_Aravo)){
+    logL=logL + dpois(PA_Aravo[i,j],
+                      boral_theta_latent_Aravo[i,j], 1)  
+  }
+}
+Deviance_boral_Aravo <- -2*logL
+# mod_boral_Aravo$mean$deviance
+
+save(T_boral_Aravo, mod_boral_Aravo, boral_theta_latent_Aravo,
+     boral_log_theta_latent_Aravo, Deviance_boral_Aravo,
+     file="boral_Aravo.RData")
+```
+
+## Mites dataset
+
+We fit a joint species distribution model, including latent variables, from the [`mites`](https://ecology.ghislainv.fr/jSDM/reference/mites.html) abundance data-set using `boral()` function to perform a poisson log-linear regression.
+
+```{r boral-mites, eval=FALSE}
+# Import center and reduce mites data-set
+data(mites, package="jSDM")
+# data.obs
+PA_Mites <- mites[,1:35]
+# Remove species with less than 10 presences
+rare_sp <- which(apply(PA_Mites>0, 2, sum) < 10) 
+PA_Mites <- PA_Mites[, -rare_sp]
+# Normalized continuous variables
+Env_Mites  <- cbind(scale(mites[,c("density","water")]),
+                    mites[,c("substrate", "shrubs", "topo")])
+mf.suit <- model.frame(formula=~., data=as.data.frame(Env_Mites))
+X_Mites <- model.matrix(attr(mf.suit,"terms"), data=mf.suit)
+# Fit the model 
+T1 <- Sys.time()
+mod_boral_Mites <- boral(y=PA_Mites, X=X_Mites[,-1],
+                         save.model=TRUE, model.name="Mites_jagsboralmodel.txt", 
+                         lv.control=list(num.lv=2), family="poisson",
+                         prior.control=list(type=c("normal","normal",
+                                                   "normal","uniform"),
+                                            hypparams = c(1, 1, 1, 10)),
+                         row.eff="none", 
+                         mcmc.control=list(n.burnin=10000,
+                                           n.iteration=20000,
+                                           n.thin=10, seed=123))
+T2 <- Sys.time()
+T_boral_Mites <- difftime(T2, T1, units="secs")
+
+# Predicted probit(theta) 
+boral_log_theta_latent_Mites <- as.matrix(X_Mites[,-1]) %*% t(mod_boral_Mites$X.coefs.mean) +
+  matrix(1,nrow=nrow(PA_Mites), ncol=1)%*%mod_boral_Mites$lv.coefs.mean[,"beta0"] + 
+  mod_boral_Mites$lv.mean%*%t(mod_boral_Mites$lv.coefs.mean[,-1]) 
+# theta_latent
+boral_theta_latent_Mites <- exp(boral_log_theta_latent_Mites)
+# Deviance
+logL=0
+for (i in 1:nrow(PA_Mites)){
+  for (j in 1:ncol(PA_Mites)){
+    logL=logL + dpois(PA_Mites[i,j],
+                      boral_theta_latent_Mites[i,j], 1)  
+  }
+}
+Deviance_boral_Mites <- -2*logL
+
+save(T_boral_Mites, mod_boral_Mites, boral_theta_latent_Mites, 
+     boral_log_theta_latent_Mites, Deviance_boral_Mites,
+     file="boral_Mites.RData")
+```
+
+# Package `Hmsc`
+
+Hierarchical Modelling of Species Communities (HMSC) is a model-based approach for analyzing community ecological data ([@Ovaskainen2017]). The obligatory data for HMSC-analyses includes a matrix of species occurrences or abundances and a matrix of environmental covariates. Additional and optional data include information about species traits and phylogenetic relationships, and information about the spatiotemporal context of the sampling design. HMSC partitions variation in species occurrences to components that relate to environmental filtering, species interactions, and random processes. `Hmsc` yields inference both at species and community levels. 
+This package and the package `jSDM` allow to fit the model defined previously, so we can compare the results obtained by each of them on different data-sets. 
+
+In a first step, we fit joint species distribution models from previous data-sets using the `Hmsc()` function from package of the same name  whose features are developed in the article [@Ovaskainen2017]. 
+
+## Simulated dataset
+
+We fit a binomial joint species distribution model, including latent variables, from the simulated data-set using the `Hmsc()` function to perform binomial probit regression.
+
+```{r Hmsc-simulation, echo=TRUE, eval=FALSE}
+setwd(paste0(dirname(rstudioapi::getSourceEditorContext()$path)))
+load("jSDM_boral_Hmsc_cache/boral_simulation.RData")
+library(Hmsc)
+studyDesign <- data.frame(sample=as.factor(1:nrow(Y)))
+rL <- HmscRandomLevel(units=studyDesign$sample)
+rL <- setPriors(rL, nfMax=2, nfMin=2)
+T1<-Sys.time() 
+mod <- Hmsc(Y=Y, XData=as.data.frame(X), XFormula=~x1+x2, XScale = FALSE,
+            distr="probit", studyDesign=studyDesign,
+            ranLevels=list("sample"=rL))
+mod_Hmsc_sim <- sampleMcmc(mod, thin=10, samples=1000, transient = 10000, nChains = 1)
+T2<-Sys.time() 
+T_Hmsc_sim=difftime(T2,T1, units="secs")
+
+# Predicted probit(theta) 
+Hmsc_theta_latent_sim <- apply(computePredictedValues(mod_Hmsc_sim),c(1,2),mean)
+Hmsc_probit_theta_latent_sim <- qnorm(Hmsc_theta_latent_sim)
+# RMSE
+#res <- evaluateModelFit(hM=mod_Hmsc_sim, predY=preds)
+SE=(theta-Hmsc_theta_latent_sim)^2
+RMSE_Hmsc_sim=sqrt(sum(SE/(nsite*nsp)))
+# Deviance 
+logL=0
+for (i in 1:nsite){
+  for (j in 1:nsp){
+    logL=logL + dbinom(Y[i,j], 1,
+                       Hmsc_theta_latent_sim[i,j], 1)  
+  }
+}
+Deviance_Hmsc_sim <- -2*logL
+
+save(np, nl, nsp, nsite, beta.target, lambda.target, X, W, theta,
+     probit_theta, Z_true, Y, T_Hmsc_sim, Hmsc_theta_latent_sim,
+     mod_Hmsc_sim, rL, Hmsc_probit_theta_latent_sim,
+     RMSE_Hmsc_sim, Deviance_Hmsc_sim,
+     file="jSDM_boral_Hmsc_cache/Hmsc_simulation.RData")
+```
+
+We visually evaluate the convergence of MCMCs by representing the trace and density *a posteriori* of some estimated parameters and we evaluate the accuracy of the estimated parameters by plotting them against the parameters used to simulate the data-set.   
+
+```{r Hmsc-simulation-plot, echo=TRUE}
+load(file="jSDM_boral_Hmsc_cache/Hmsc_simulation.RData")
+codaObject <- Hmsc::convertToCodaObject(mod_Hmsc_sim, start=1)
+
+# Trace and density plot of MCMC chains of parameters to visually evaluate convergence 
+## Fixed species effect beta
+par(mfrow=c(ncol(X),2))
+for(j in 1:2){
+  MCMC.betaj <- codaObject$Beta[[1]][,grepl(paste0("sp0",j),colnames(codaObject$Beta[[1]]))]
+  for(p in 1:ncol(X)){
+      coda::traceplot(MCMC.betaj[,p],
+                      main=paste0("Trace of ", colnames(MCMC.betaj)[p]))
+      coda::densplot(MCMC.betaj[,p],
+                     main=paste0("Density of ", colnames(MCMC.betaj)[p]))
+      abline(v=beta.target[p,j],col='red')
+  }
+}
+Hmsc_beta <- t(getPostEstimate(hM=mod_Hmsc_sim, parName='Beta')$mean)
+
+## factor loadings lambda_j
+par(mfrow=c(2,2))
+for(j in 1:2){
+  MCMC.lambdaj <- codaObject$Lambda[[1]][,grepl(paste0("sp0",j),colnames(codaObject$Lambda[[1]][[1]]))][[1]]
+  for(l in 1:rL$nfMax){
+      coda::traceplot(MCMC.lambdaj[,l],
+                      main=paste0("Trace of ", colnames(MCMC.lambdaj)[l]))
+      coda::densplot(MCMC.lambdaj[,l],
+                     main=paste0("Density of ", colnames(MCMC.lambdaj)[l]))
+      abline(v=lambda.target[l,j],col='red')
+  }
+}
+Hmsc_lambda <- t(getPostEstimate(hM=mod_Hmsc_sim, parName='Lambda', r=1)$mean)
+
+
+par(mfrow=c(1,2))
+plot(t(beta.target), Hmsc_beta,
+     xlab="obs", ylab="fitted", main="Fixed species effect beta") 
+abline(a=0,b=1,col='red')
+plot(t(lambda.target),Hmsc_lambda,
+     xlab="obs", ylab="fitted", main="Loading factors lambda") 
+abline(a=0,b=1,col='red')
+
+## Latent variable W 
+Hmsc_lvs <- getPostEstimate(hM=mod_Hmsc_sim, parName='Eta', r=1)$mean
+
+for (l in 1:nl) {
+  plot(W[,l],Hmsc_lvs[,l],
+       main=paste0("Latent variable W_", l),
+       xlab="obs", ylab="fitted")
+  abline(a=0,b=1,col='red')
+}
+
+## Prediction
+# probit_theta_latent 
+
+plot(probit_theta, Hmsc_probit_theta_latent_sim,
+     main="probit(theta)", xlab ="obs", ylab="fitted")
+abline(a=0,b=1,col='red')
+# theta
+plot(pnorm(probit_theta), 
+     Hmsc_theta_latent_sim,
+     main="theta", xlab ="obs", ylab="fitted")
+abline(a=0,b=1,col='red')
+
+```
+
+
+```{r Hmsc-simulation-plot2, echo=FALSE, out.width=800, eval=TRUE}
+knitr::include_graphics(paste0("jSDM_boral_Hmsc_files/figure-html/Hmsc-simulation-plot-", 1:7, ".png"))
+```
+
+Overall, the traces and the densities of the parameters indicate the convergence of the algorithm. Indeed, we observe on the traces that the values oscillate around averages without showing an upward or downward trend and we see that the densities are quite smooth and for the most part of Gaussian form.  
+On the above figures, the estimated parameters are close to the expected values if the points are near the red line representing the identity function ($y=x$). 
+
+## Mosquitos dataset
+
+We fit a binomial joint species distribution model, including latent variables, from the [`mosquitos`](https://ecology.ghislainv.fr/jSDM/reference/mosquitos.html) data-set using `Hmsc()` function to perform binomial probit regression.
+
+```{r Hmsc-mosquito, eval=FALSE}
+# Import center and reduce Mosquito data-set
+data(mosquitos, package="jSDM")
+head(mosquitos)
+Env_Mosquitos <- mosquitos[,17:29]
+Env_Mosquitos <- cbind(scale(Env_Mosquitos[,1:4]), Env_Mosquitos[,5:13])
+PA_Mosquitos <- mosquitos[,1:16]
+
+# Define the model 
+studyDesign <- data.frame(sample=as.factor(1:nrow(PA_Mosquitos)))
+rL <- HmscRandomLevel(units=studyDesign$sample)
+rL <- setPriors(rL, nfMax=2, nfMin=2)
+# Fit the model 
+T1<-Sys.time() 
+mod <- Hmsc(Y=PA_Mosquitos, XData=as.data.frame(Env_Mosquitos), XFormula=~., XScale = FALSE,
+            distr="probit", studyDesign=studyDesign,
+            ranLevels=list("sample"=rL))
+mod_Hmsc_Mosquitos <- sampleMcmc(mod, thin=10, samples=1000, transient = 10000, nChains = 1)
+T2<-Sys.time() 
+T_Hmsc_Mosquitos=difftime(T2,T1, units="secs")
+
+# Predicted probit(theta) 
+Hmsc_theta_latent_Mosquitos  <- apply(computePredictedValues(mod_Hmsc_Mosquitos),c(1,2),mean)
+Hmsc_probit_theta_latent_Mosquitos  <- qnorm(Hmsc_theta_latent_Mosquitos)
+
+# Deviance 
+logL=0
+for (i in 1:nrow(PA_Mosquitos)){
+  for (j in 1:ncol(PA_Mosquitos)){
+    logL=logL + dbinom(PA_Mosquitos [i,j], 1,
+                       Hmsc_theta_latent_Mosquitos[i,j], 1)  
+  }
+}
+Deviance_Hmsc_Mosquitos  <- -2*logL
+
+save(T_Hmsc_Mosquitos, mod_Hmsc_Mosquitos, Hmsc_theta_latent_Mosquitos,
+     Hmsc_probit_theta_latent_Mosquitos, Deviance_Hmsc_Mosquitos,
+     file="jSDM_boral_Hmsc_cache/Hmsc_Mosquitos.RData")
+```
+
+## Eucalypts dataset
+
+We fit a binomial joint species distribution model, including latent variables, from the [`eucalypts`](https://ecology.ghislainv.fr/jSDM/reference/eucalypts.html) data-set using `Hmsc()` function to perform binomial probit regression.
+
+```{r Hmsc-eucalypts, eval=FALSE}
+# Import center and reduce Eucalypts data-set
+data(eucalypts, package="jSDM")
+head(eucalypts)
+Env_Eucalypts <- cbind(scale(eucalypts[,c("Rockiness","VallyBotFlat","PPTann", "cvTemp","T0")]),eucalypts[,c("Sandiness","Loaminess")])
+PA_Eucalypts <- eucalypts[,1:12]
+Env_Eucalypts <- Env_Eucalypts[rowSums(PA_Eucalypts) != 0,]
+# Remove sites where none species was recorded
+PA_Eucalypts<- PA_Eucalypts[rowSums(PA_Eucalypts) != 0,]
+
+# Define the model 
+studyDesign <- data.frame(sample=as.factor(1:nrow(PA_Eucalypts)))
+rL <- HmscRandomLevel(units=studyDesign$sample)
+rL <- setPriors(rL, nfMax=2, nfMin=2)
+# Fit the model 
+T1<-Sys.time() 
+mod <- Hmsc(Y=PA_Eucalypts, XData=as.data.frame(Env_Eucalypts), XFormula=~., XScale = FALSE,
+            distr="probit", studyDesign=studyDesign,
+            ranLevels=list("sample"=rL))
+mod_Hmsc_Eucalypts <- sampleMcmc(mod, thin=10, samples=1000, transient = 10000, nChains = 1)
+T2<-Sys.time() 
+T_Hmsc_Eucalypts=difftime(T2,T1, units="secs")
+
+# Predicted probit(theta) 
+Hmsc_theta_latent_Eucalypts  <- apply(computePredictedValues(mod_Hmsc_Eucalypts),c(1,2),mean)
+Hmsc_probit_theta_latent_Eucalypts  <- qnorm(Hmsc_theta_latent_Eucalypts)
+
+# Deviance 
+logL=0
+for (i in 1:nrow(PA_Eucalypts)){
+  for (j in 1:ncol(PA_Eucalypts)){
+    logL=logL + dbinom(PA_Eucalypts[i,j], 1,
+                       Hmsc_theta_latent_Eucalypts[i,j], 1)  
+  }
+}
+Deviance_Hmsc_Eucalypts  <- -2*logL
+
+save(T_Hmsc_Eucalypts, mod_Hmsc_Eucalypts, Hmsc_theta_latent_Eucalypts,
+     Hmsc_probit_theta_latent_Eucalypts, Deviance_Hmsc_Eucalypts,
+     file="jSDM_boral_Hmsc_cache/Hmsc_Eucalypts.RData")
+```
+
+## Frogs dataset
+
+We fit a binomial joint species distribution model, including latent variables, from the [`frogs`](https://ecology.ghislainv.fr/jSDM/reference/frogs.html) data-set using `Hmsc()` function to perform binomial probit regression.
+
+```{r Hmsc-frogs, eval=FALSE}
+# Import center and reduce Frogs data-set
+data(frogs, package="jSDM")
+head(frogs)
+Env_Frogs <- cbind(scale(frogs[,"Covariate_1"]),frogs[,"Covariate_2"],
+                   scale(frogs[,"Covariate_3"]))
+colnames(Env_Frogs) <- colnames(frogs[,1:3])
+PA_Frogs <- frogs[,4:12]
+
+# Define the model 
+studyDesign <- data.frame(sample=as.factor(1:nrow(PA_Frogs)))
+rL <- HmscRandomLevel(units=studyDesign$sample)
+rL <- setPriors(rL, nfMax=2, nfMin=2)
+# Fit the model 
+T1<-Sys.time() 
+mod <- Hmsc(Y=PA_Frogs, XData=as.data.frame(Env_Frogs), XFormula=~., XScale = FALSE,
+            distr="probit", studyDesign=studyDesign,
+            ranLevels=list("sample"=rL))
+mod_Hmsc_Frogs <- sampleMcmc(mod, thin=10, samples=1000, transient = 10000, nChains = 1)
+T2<-Sys.time() 
+T_Hmsc_Frogs=difftime(T2,T1, units="secs")
+
+# Predicted probit(theta) 
+Hmsc_theta_latent_Frogs  <- apply(computePredictedValues(mod_Hmsc_Frogs),c(1,2),mean)
+Hmsc_probit_theta_latent_Frogs  <- qnorm(Hmsc_theta_latent_Frogs)
+
+# Deviance 
+logL=0
+for (i in 1:nrow(PA_Frogs)){
+  for (j in 1:ncol(PA_Frogs)){
+    logL=logL + dbinom(PA_Frogs [i,j], 1,
+                       Hmsc_theta_latent_Frogs[i,j], 1)  
+  }
+}
+Deviance_Hmsc_Frogs  <- -2*logL
+
+save(T_Hmsc_Frogs, mod_Hmsc_Frogs, Hmsc_theta_latent_Frogs,
+     Hmsc_probit_theta_latent_Frogs, Deviance_Hmsc_Frogs,
+     file="jSDM_boral_Hmsc_cache/Hmsc_Frogs.RData")
+```
+
+## Fungi dataset
+
+We fit a binomial joint species distribution model, including latent variables, from the [`fungi`](https://ecology.ghislainv.fr/jSDM/reference/fungi.html) data-set using `Hmsc()` function to perform binomial probit regression.
+
+```{r Hmsc-fungi, eval=FALSE}
+# Import center and reduce fungi data-set
+data(fungi, package="jSDM")
+Env_Fungi <- cbind(scale(fungi[,c("diam","epi","bark")]),
+                   fungi[,c("dc1","dc2","dc3","dc4", 
+                   "quality3","quality4","ground3","ground4")])
+colnames(Env_Fungi) <- c("diam","epi","bark","dc1","dc2","dc3","dc4",
+                         "quality3","quality4","ground3","ground4")
+PA_Fungi <- fungi[,c("antser","antsin","astfer","fompin","hetpar","junlut",
+                     "phefer","phenig","phevit","poscae","triabi")]
+Env_Fungi <- Env_Fungi[rowSums(PA_Fungi) != 0,]
+# Remove sites where none species was recorded
+PA_Fungi <- PA_Fungi[rowSums(PA_Fungi) != 0,]
+
+# Define the model 
+studyDesign <- data.frame(sample=as.factor(1:nrow(PA_Fungi)))
+rL <- HmscRandomLevel(units=studyDesign$sample)
+rL <- setPriors(rL, nfMax=2, nfMin=2)
+# Fit the model 
+T1<-Sys.time() 
+mod <- Hmsc(Y=PA_Fungi, XData=as.data.frame(Env_Fungi), XFormula=~., XScale = FALSE,
+            distr="probit", studyDesign=studyDesign,
+            ranLevels=list("sample"=rL))
+mod_Hmsc_Fungi <- sampleMcmc(mod, thin=10, samples=1000, transient = 10000, nChains = 1)
+T2<-Sys.time() 
+T_Hmsc_Fungi=difftime(T2,T1, units="secs")
+
+# Predicted probit(theta) 
+Hmsc_theta_latent_Fungi  <- apply(computePredictedValues(mod_Hmsc_Fungi),c(1,2), mean)
+Hmsc_probit_theta_latent_Fungi  <- qnorm(Hmsc_theta_latent_Fungi)
+
+# Deviance 
+logL=0
+for (i in 1:nrow(PA_Fungi)){
+  for (j in 1:ncol(PA_Fungi)){
+    logL=logL + dbinom(PA_Fungi[i,j], 1,
+                       Hmsc_theta_latent_Fungi[i,j], 1)  
+  }
+}
+Deviance_Hmsc_Fungi  <- -2*logL
+
+save(T_Hmsc_Fungi, mod_Hmsc_Fungi, Hmsc_theta_latent_Fungi,
+     Hmsc_probit_theta_latent_Fungi, Deviance_Hmsc_Fungi,
+     file="jSDM_boral_Hmsc_cache/Hmsc_Fungi.RData")
+```
+
+## Aravo dataset
+
+We fit a joint species distribution model, including latent variables, from the [`aravo`](https://ecology.ghislainv.fr/jSDM/reference/aravo.html) data-set using `Hmsc()` function to perform poisson log-linear regression.
+
+```{r Hmsc-aravo, eval=FALSE}
+# Import aravo data-set
+data(aravo, package="jSDM")
+# data.obs
+PA_Aravo <- aravo$spe
+# Remove species with less than 5 presences
+rare_sp <- which(apply(PA_Aravo>0, 2, sum) < 5) 
+PA_Aravo <- PA_Aravo[, -rare_sp]
+# Only snow variable considering a quadratic orthogonal polynomial.
+# Normalized continuous variables
+p <- poly(aravo$env$Snow, 2)
+Env_Aravo <- data.frame(p)
+names(Env_Aravo) <- c("snow", "snow2")
+# Normalized continuous species traits
+Tr_Aravo <- data.frame(scale(aravo$traits[-rare_sp, ]))
+
+
+# Define the model 
+studyDesign <- data.frame(sample=as.factor(1:nrow(PA_Aravo)))
+rL <- HmscRandomLevel(units=studyDesign$sample)
+rL <- setPriors(rL, nfMax=2, nfMin=2)
+# Fit the model 
+T1<-Sys.time() 
+mod <- Hmsc(Y=PA_Aravo, XData=as.data.frame(Env_Aravo), XFormula=~., XScale = FALSE,
+            distr="poisson", studyDesign=studyDesign, TrData=Tr_Aravo, TrScale=FALSE,
+            TrFormula=~SLA, ranLevels=list("sample"=rL))
+mod_Hmsc_Aravo <- sampleMcmc(mod, thin=10, samples=1000, transient = 10000, nChains = 1)
+T2<-Sys.time() 
+T_Hmsc_Aravo=difftime(T2,T1, units="secs")
+
+# Predicted probit(theta) 
+Hmsc_theta_latent_Aravo  <- apply(computePredictedValues(mod_Hmsc_Aravo),c(1,2),mean)
+Hmsc_log_theta_latent_Aravo  <- log(Hmsc_theta_latent_Aravo)
+
+# Deviance
+logL=0
+for (i in 1:nrow(PA_Aravo)){
+  for (j in 1:ncol(PA_Aravo)){
+    logL= logL + dpois(PA_Aravo[i,j],
+                       Hmsc_theta_latent_Aravo[i,j], 1)  
+  }
+}
+Deviance_Hmsc_Aravo <- -2*logL
+save(T_Hmsc_Aravo, mod_Hmsc_Aravo, Hmsc_theta_latent_Aravo,
+     Hmsc_log_theta_latent_Aravo, Deviance_Hmsc_Aravo,
+     file="jSDM_boral_Hmsc_cache/Hmsc_Aravo.RData")
+```
+
+## Mites dataset
+
+We fit a joint species distribution model, including latent variables, from the [`mites`](https://ecology.ghislainv.fr/jSDM/reference/mites.html) abundance data-set using `Hmsc()` function to perform a poisson log-linear regression.
+
+```{r Hmsc-mites, eval=FALSE}
+# Import center and reduce mites data-set
+data(mites, package="jSDM")
+# data.obs
+PA_Mites <- mites[,1:35]
+# Remove species with less than 10 presences
+rare_sp <- which(apply(PA_Mites>0, 2, sum) < 10) 
+PA_Mites <- PA_Mites[, -rare_sp]
+# Normalized continuous variables
+Env_Mites  <- cbind(scale(mites[,c("density","water")]),
+                    mites[,c("substrate", "shrubs", "topo")])
+mf.suit <- model.frame(formula=~., data=as.data.frame(Env_Mites))
+X_Mites <- model.matrix(attr(mf.suit,"terms"), data=mf.suit)
+
+# Define the model 
+studyDesign <- data.frame(sample=as.factor(1:nrow(PA_Mites)))
+rL <- HmscRandomLevel(units=studyDesign$sample)
+rL <- setPriors(rL, nfMax=2, nfMin=2)
+# Fit the model 
+T1<-Sys.time() 
+mod <- Hmsc(Y=PA_Mites, XData=as.data.frame(Env_Mites), XFormula=~., XScale=FALSE,
+            distr="poisson", studyDesign=studyDesign,
+            ranLevels=list("sample"=rL))
+mod_Hmsc_Mites <- sampleMcmc(mod, thin=10, samples=1000, transient = 10000, nChains = 1)
+T2 <- Sys.time()
+T_Hmsc_Mites <- difftime(T2,T1, units="secs")
+
+# Predicted probit(theta) 
+Hmsc_theta_latent_Mites  <- apply(computePredictedValues(mod_Hmsc_Mites),c(1,2),mean)
+Hmsc_log_theta_latent_Mites  <- log(Hmsc_theta_latent_Mites)
+
+# Deviance
+logL=0
+for (i in 1:nrow(PA_Mites)){
+  for (j in 1:ncol(PA_Mites)){
+    logL=logL + dpois(PA_Mites[i,j],
+                      Hmsc_theta_latent_Mites[i,j], 1)  
+  }
+}
+Deviance_Hmsc_Mites <- -2*logL
+
+save(T_Hmsc_Mites, mod_Hmsc_Mites, Hmsc_theta_latent_Mites,
+     Hmsc_log_theta_latent_Mites, Deviance_Hmsc_Mites,
+     file="jSDM_boral_Hmsc_cache/Hmsc_Mites.RData")
+```
+
+
+# Package `jSDM`
+
+In a second step, we fit the same joint species distribution models from each of the previous data-sets using the `jSDM` package.
+
+## Simulated dataset
+
+We fit a binomial joint species distribution model, including latent variables, from the simulated data-set using the `jSDM_binomial_probit()` function to perform binomial probit regression.
+
+```{r jSDM-simulation, eval=FALSE}
+setwd(paste0(dirname(rstudioapi::getSourceEditorContext()$path)))
+load("jSDM_boral_Hmsc_cache/Hmsc_simulation.RData")
+np <- ncol(X)
+library(jSDM)
+# Fit the model
+T1<-Sys.time() 
+mod_jSDM_sim <- jSDM_binomial_probit(
+  # Chains
+  burnin=10000, mcmc=10000, thin=10,
+  # Response variable
+  presence_data=Y, 
+  # Explanatory variables 
+  site_formula=~x1+x2,   
+  site_data=X,
+  # Model specification
+  n_latent=2, site_effect="none",
+  # Starting values
+  beta_start=0,
+  lambda_start=0, W_start=0,
+  # Priors 
+  mu_beta=0, V_beta=1,
+  mu_lambda=0, V_lambda=1,
+  # Various 
+  seed=123, verbose=1)
+T2<-Sys.time() 
+T_jSDM_sim=difftime(T2,T1, units="secs")
+
+# RMSE
+SE=(theta-mod_jSDM_sim$theta_latent)^2
+RMSE_jSDM_sim=sqrt(sum(SE/(nsite*nsp)))
+
+save(T_jSDM_sim, mod_jSDM_sim, RMSE_jSDM_sim,
+     file="jSDM_boral_Hmsc_cache/jSDM_simulation.RData")
+```
+
+We visually evaluate the convergence of MCMCs by representing the trace and density *a posteriori* of some estimated parameters and we evaluate the accuracy of the estimated parameters by plotting them against the parameters used to simulate the data-set.   
+
+```{r jSDM-simulation-plot}
+load(file="jSDM_boral_Hmsc_cache/jSDM_simulation.RData")
+load(file="jSDM_boral_Hmsc_cache/Hmsc_simulation.RData")
+# ===================================================
+# Result analysis
+# ===================================================
+
+# Trace and density plot of MCMC chains of parameters to visually evaluate convergence 
+## Fixed species effect beta
+np <- ncol(X)
+mean_beta <- matrix(0,nsp,np)
+par(mfrow=c(ncol(X),2))
+for (j in 1:nsp) {
+  for (p in 1:ncol(X)) {
+    mean_beta[j,p] <-mean(mod_jSDM_sim$mcmc.sp[[j]][,p])
+    if (j < 3){
+      coda::traceplot(coda::as.mcmc(mod_jSDM_sim$mcmc.sp[[j]][,p]),
+                      main=paste("Trace of ", colnames(mod_jSDM_sim$mcmc.sp
+                                         [[j]])[p],", species : ",j))
+      coda::densplot(coda::as.mcmc(mod_jSDM_sim$mcmc.sp[[j]][,p]), 
+                     main=paste("Density of ", colnames(mod_jSDM_sim$mcmc.sp
+                                         [[j]])[p],", species : ",j))
+      abline(v=beta.target[p,j],col='red')
+    }
+  }
+}
+
+## factor loadings lambda_j
+mean_lambda <- matrix(0,nsp,nl)
+par(mfrow=c(nl,2))
+for (j in 1:nsp) {
+  for (l in 1:nl) {
+    mean_lambda[j,l] <-mean(mod_jSDM_sim$mcmc.sp[[j]][,ncol(X)+l])
+    
+    if (j < 3){
+      coda::traceplot(coda::as.mcmc(mod_jSDM_sim$mcmc.sp[[j]][,ncol(X)+l]),
+                      main=paste("Trace of", colnames(mod_jSDM_sim$mcmc.sp
+                                         [[j]])[ncol(X)+l],", species : ",j))
+      coda::densplot(coda::as.mcmc(mod_jSDM_sim$mcmc.sp[[j]][,ncol(X)+l]), 
+                     main=paste("Density of", colnames(mod_jSDM_sim$mcmc.sp
+                                         [[j]])[ncol(X)+l],", species : ",j))
+      abline(v=lambda.target[l,j],col='red')
+    }
+  }
+}
+par(mfrow=c(1,2))
+plot(t(beta.target),mean_beta, xlab="obs", ylab="fitted", 
+     main="Fixed species effect beta")
+abline(a=0,b=1,col='red')
+plot(t(lambda.target),mean_lambda, xlab="obs", ylab="fitted", 
+     main="Loading factors lambda")
+abline(a=0,b=1,col='red')
+
+## W latent variables
+
+for (l in 1:nl) {
+  plot(W[,l],apply(mod_jSDM_sim$mcmc.latent[[paste0("lv_",l)]],2,mean),
+       main=paste0("Latent variable W_", l), xlab="obs", ylab="fitted")
+  abline(a=0,b=1,col='red')
+}
+
+## Deviance
+plot(mod_jSDM_sim$mcmc.Deviance, main="Deviance")
+
+#= Predictions
+## probit_theta
+
+plot(probit_theta, mod_jSDM_sim$probit_theta_latent,
+     xlab="obs",ylab="fitted", main="probit(theta)")
+abline(a=0,b=1,col='red')
+## theta
+plot(pnorm(probit_theta),mod_jSDM_sim$theta_latent,
+     xlab="obs",ylab="fitted", main="theta")
+abline(a=0,b=1,col='red')
+```
+
+
+```{r jSDM-simulation-plot2, echo=FALSE, out.width=800, eval=TRUE}
+knitr::include_graphics(paste0("jSDM_boral_Hmsc_files/figure-html/jSDM-simulation-plot-", 1:8, ".png"))
+```
+
+Overall, the traces and the densities of the parameters indicate the convergence of the algorithm. Indeed, we observe on the traces that the values oscillate around averages without showing an upward or downward trend and we see that the densities are quite smooth and for the most part of Gaussian form.  
+On the above figures, the estimated parameters are close to the expected values if the points are near the red line representing the identity function ($y=x$). 
+
+## Mosquitos dataset
+
+We fit a binomial joint species distribution model, including latent variables, from the [`mosquitos`](https://ecology.ghislainv.fr/jSDM/reference/mosquitos.html) data-set using `jSDM_binomial_probit()` function to perform binomial probit regression.
+
+```{r jSDM-mosquitos, eval=FALSE}
+# Fit the model
+T1 <- Sys.time()
+mod_jSDM_Mosquitos <- jSDM_binomial_probit(
+  # Chains 
+  burnin=10000, mcmc=10000, thin=10,
+  # Response variable 
+  presence_data=PA_Mosquitos, 
+  # Explanatory variables 
+  site_formula=~.,   
+  site_data=Env_Mosquitos,
+  # Model specification
+  site_effect="none", n_latent=2,
+  # Starting values 
+  beta_start=0,
+  lambda_start=0, W_start=0,
+  # Priors
+  mu_beta=0, V_beta=1,
+  mu_lambda=0, V_lambda=1,
+  # Various 
+  seed=123, verbose=1)
+T2 <- Sys.time()
+T_jSDM_Mosquitos <- difftime(T2,T1, units="secs")
+save(T_jSDM_Mosquitos, mod_jSDM_Mosquitos,
+     file="jSDM_boral_Hmsc_cache/jSDM_Mosquitos.RData")
+```
+
+## Eucalypts dataset
+
+We fit a binomial joint species distribution model, including latent variables, from the [`eucalypts`](https://ecology.ghislainv.fr/jSDM/reference/eucalypts.html) data-set using `jSDM_binomial_probit()` function to perform binomial probit regression.
+
+```{r jSDM-eucalypts, eval=FALSE}
+# Fit the model
+T1 <- Sys.time()
+mod_jSDM_Eucalypts <- jSDM_binomial_probit(
+  # Chains
+  burnin=10000, mcmc=10000, thin=10,
+  # Response variable 
+  presence_data=PA_Eucalypts,
+  # Explanatory variables 
+  site_formula=~.,   
+  site_data=Env_Eucalypts,
+  # Model specification
+  n_latent=2, site_effect="none",
+  # Starting values 
+  beta_start=0,
+  lambda_start=0, W_start=0,
+  # Priors
+  mu_beta=0, V_beta=1,
+  mu_lambda=0, V_lambda=1,
+  # Various 
+  seed=123, verbose=1)
+T2 <- Sys.time()
+T_jSDM_Eucalypts <- difftime(T2,T1, units="secs")
+save(T_jSDM_Eucalypts, mod_jSDM_Eucalypts,
+     file="jSDM_boral_Hmsc_cache/jSDM_Eucalypts.RData")
+```
+
+## Frogs dataset
+
+We fit a binomial joint species distribution model, including latent variables, from the [`frogs`](https://ecology.ghislainv.fr/jSDM/reference/frogs.html) data-set using `jSDM_binomial_probit()` function to perform binomial probit regression.
+
+```{r jSDM-frogs, eval=FALSE}
+# Fit the model 
+T1 <- Sys.time()
+mod_jSDM_Frogs <- jSDM_binomial_probit(
+  # Chains
+  burnin=10000, mcmc=10000, thin=10,
+  # Response variable 
+  presence_data=as.matrix(PA_Frogs), 
+  # Explanatory variables 
+  site_formula=~.,   
+  site_data=as.data.frame(Env_Frogs),
+  # Model specification 
+  n_latent=2, site_effect="none",
+  # Starting values 
+  beta_start=0,
+  lambda_start=0, W_start=0,
+  # Priors 
+  mu_beta=0, V_beta=1,
+  mu_lambda=0, V_lambda=1,
+  # Various 
+  seed=123, verbose=1)
+T2 <- Sys.time()
+T_jSDM_Frogs <- difftime(T2,T1, units="secs")
+save(T_jSDM_Frogs, mod_jSDM_Frogs,
+     file="jSDM_boral_Hmsc_cache/jSDM_Frogs.RData")
+```
+
+## Fungi dataset
+
+We fit a binomial joint species distribution model, including latent variables, from the [`fungi`](https://ecology.ghislainv.fr/jSDM/reference/fungi.html) data-set using `jSDM_binomial_probit()` function to perform binomial probit regression.
+
+```{r jSDM-fungi, eval=FALSE}
+# Fit the model
+T1 <- Sys.time()
+mod_jSDM_Fungi <- jSDM_binomial_probit(
+  # Chains 
+  burnin=10000, mcmc=10000, thin=10,
+  # Response variable 
+  presence_data=PA_Fungi, 
+  # Explanatory variables 
+  site_formula=~.,   
+  site_data=Env_Fungi,
+  # Model specification
+  n_latent=2, site_effect="none",
+  # Starting values 
+  beta_start=0,
+  lambda_start=0, W_start=0,
+  mu_beta=0, V_beta=1,
+  mu_lambda=0, V_lambda=1,
+  # Various 
+  seed=123, verbose=1)
+T2 <- Sys.time()
+T_jSDM_Fungi <- difftime(T2,T1, units="secs")
+save(T_jSDM_Fungi, mod_jSDM_Fungi,
+     file="jSDM_boral_Hmsc_cache/jSDM_Fungi.RData")
+```
+
+## Aravo dataset
+
+We fit a binomial joint species distribution model including latent variables, from the [`aravo`](https://ecology.ghislainv.fr/jSDM/reference/aravo.html) data-set using `jSDM_poisson_log()` function to perform poisson log-linear regression.
+
+```{r jSDM-aravo, eval=FALSE}
+# Import aravo data-set
+data(aravo, package="jSDM")
+# data.obs
+PA_Aravo <- aravo$spe
+# Remove species with less than 5 presences
+rare_sp <- which(apply(PA_Aravo>0, 2, sum) < 5) 
+PA_Aravo <- PA_Aravo[, -rare_sp]
+# Only snow variable considering a quadratic orthogonal polynomial.
+# Normalized continuous variables
+p <- poly(aravo$env$Snow, 2)
+Env_Aravo <- data.frame(p)
+names(Env_Aravo) <- c("snow", "snow2")
+# Normalized continuous species traits
+Tr_Aravo <- data.frame(SLA=scale(aravo$traits[-rare_sp, "SLA"]))
+
+# Fit the model
+T1 <- Sys.time()
+mod_jSDM_Aravo <- jSDM_poisson_log(
+  # Chains 
+  burnin=10000, mcmc=10000, thin=10,
+  # Response variable 
+  count_data=PA_Aravo, 
+  # Explanatory variables 
+  site_formula=~ snow + snow2,   
+  site_data=Env_Aravo,
+  trait_data = Tr_Aravo,
+  trait_formula = ~ SLA + snow:SLA + snow2:SLA,
+  # Model specification
+  n_latent=2, site_effect="none",
+  # Starting values 
+  beta_start=0,
+  lambda_start=0, W_start=0,
+  # Priors 
+  mu_gamma=0, V_gamma=1,
+  V_beta=10,
+  mu_lambda=0, V_lambda=1,
+  # Various 
+  seed=123, verbose=1)
+T2 <- Sys.time()
+T_jSDM_Aravo <- difftime(T2,T1, units="secs")
+save(T_jSDM_Aravo, mod_jSDM_Aravo,
+     file="jSDM_boral_Hmsc_cache/jSDM_Aravo.RData")
+```
+
+
+## Mites dataset
+
+We fit a joint species distribution model, including latent variables, from the [`mites`](https://ecology.ghislainv.fr/jSDM/reference/mites.html) abundance data-set using `jSDM_poisson_log()` function to perform a poisson log-linear regression. 
+
+```{r jSDM-mites, eval=FALSE}
+# Fit the model
+T1 <- Sys.time()
+mod_jSDM_Mites <- jSDM_poisson_log(
+  # Chains 
+  burnin=10000, mcmc=10000, thin=10,
+  # Response variable 
+  count_data=PA_Mites, 
+  # Explanatory variables 
+  site_formula=~.,   
+  site_data=Env_Mites,
+  # Model specification
+  n_latent=2, site_effect="none",
+  # Starting values 
+  beta_start=0,
+  lambda_start=0, W_start=0,
+  # Priors 
+  mu_beta=0, V_beta=1,
+  mu_lambda=0, V_lambda=1,
+  # Various 
+  ropt=0.44,
+  seed=123, verbose=1)
+T2 <- Sys.time()
+T_jSDM_Mites <- difftime(T2,T1, units="secs")
+save(T_jSDM_Mites, mod_jSDM_Mites,
+     file="jSDM_boral_Hmsc_cache/jSDM_Mites.RData")
+```
+
+# Comparison
+
+Then we compare the compilation time and the results obtained with each package.  
+
+```{r load-fitted-models, echo=FALSE, include=FALSE, eval=TRUE, cache=FALSE}
+# Simulated data-set
+load(file="jSDM_boral_Hmsc_cache/boral_simulation.RData")  
+load(file="jSDM_boral_Hmsc_cache/Hmsc_simulation.RData")
+load(file="jSDM_boral_Hmsc_cache/jSDM_simulation.RData")
+# Mosquitos data-set
+load(file="jSDM_boral_Hmsc_cache/Hmsc_Mosquitos.RData")
+load(file="jSDM_boral_Hmsc_cache/boral_Mosquitos.RData")
+load(file="jSDM_boral_Hmsc_cache/jSDM_Mosquitos.RData")
+# Eucalypts data-set
+load(file="jSDM_boral_Hmsc_cache/Hmsc_Eucalypts.RData")
+load(file="jSDM_boral_Hmsc_cache/boral_Eucalypts.RData")
+load(file="jSDM_boral_Hmsc_cache/jSDM_Eucalypts.RData")
+# Frogs data-set 
+load(file="jSDM_boral_Hmsc_cache/Hmsc_Frogs.RData")
+load(file="jSDM_boral_Hmsc_cache/boral_Frogs.RData")
+load(file="jSDM_boral_Hmsc_cache/jSDM_Frogs.RData")
+# Fungi data-set 
+load(file="jSDM_boral_Hmsc_cache/Hmsc_Fungi.RData")
+load(file="jSDM_boral_Hmsc_cache/boral_Fungi.RData")
+load(file="jSDM_boral_Hmsc_cache/jSDM_Fungi.RData")
+# Aravo data-set
+load(file="jSDM_boral_Hmsc_cache/Hmsc_Aravo.RData")
+load(file="jSDM_boral_Hmsc_cache/boral_Aravo.RData")
+load(file="jSDM_boral_Hmsc_cache/jSDM_Aravo.RData")
+# Mites data-set
+load(file="jSDM_boral_Hmsc_cache/Hmsc_Mites.RData")
+load(file="jSDM_boral_Hmsc_cache/boral_Mites.RData")
+load(file="jSDM_boral_Hmsc_cache/jSDM_Mites.RData")
+logL=0
+for (i in 1:nsite){
+  for (j in 1:nsp){
+    logL=logL + dbinom(Y[i,j], 1, mod_jSDM_sim$theta_latent[i,j], 1) 
+  }
+}
+Deviance_jSDM_sim <- -2*logL
+# Presence/Absence data-sets 
+for(suffix in c("Mosquitos","Eucalypts","Frogs","Fungi")){
+logL=0
+for (i in 1:nrow(eval(parse(text=paste0("PA_", suffix)), env=.GlobalEnv))){
+  for (j in 1:ncol(eval(parse(text=paste0("PA_", suffix)), env=.GlobalEnv))){
+    theta <- eval(parse(text=paste0("mod_jSDM_", suffix, "$theta_latent[i,j]")), env=.GlobalEnv)
+    logL=logL + dbinom(eval(parse(text=paste0("PA_", suffix)), env=.GlobalEnv)[i,j], 1, theta, 1)  
+  }
+}
+assign(paste0("Deviance_jSDM_", suffix), -2*logL)
+}
+# Abundance data-sets
+for(suffix in c("Mites", "Aravo")){
+  logL=0
+  for (i in 1:nrow(eval(parse(text=paste0("PA_", suffix)), env=.GlobalEnv))){
+    for (j in 1:ncol(eval(parse(text=paste0("PA_", suffix)), env=.GlobalEnv))){
+      theta <- eval(parse(text=paste0("mod_jSDM_", suffix, "$theta_latent[i,j]")), env=.GlobalEnv)
+      logL=logL + dpois(eval(parse(text=paste0("PA_", suffix)), env=.GlobalEnv)[i,j],
+                        theta,1)  
+    }
+  }
+  assign(paste0("Deviance_jSDM_", suffix), -2*logL)
+}
+
+# Accuracy 
+# Compute the proportion of species predicted as present 
+# among the species  observed at each site for the different data-sets.
+Sensitivity <- function(PA, theta){
+  n_sites <- nrow(PA)
+  score <- 0
+  for(i in 1:n_sites){
+    # Sensitivity 
+    obs_sp <- which(PA[i,]>0)
+    nobs_sp <- length(obs_sp)
+    pred_sp <- which(theta[i,] >= sort(theta[i,], decreasing = TRUE)[nobs_sp])
+    score <- score + sum(pred_sp %in% obs_sp)/ifelse(nobs_sp!=0, nobs_sp,1)
+  }
+  return(score/n_sites)
+}
+Specificity  <- function(PA, theta){
+  n_sites <- nrow(PA)
+  score <- 0
+  for(i in 1:n_sites){
+    # Specificity 
+    abs_sp <- which(PA[i,]==0)
+    nabs_sp <- length(abs_sp)
+    pred_abs_sp <- which(theta[i,] <= sort(theta[i,])[nabs_sp])
+    score <- score + sum(pred_abs_sp %in% abs_sp)/ifelse(nabs_sp!=0, nabs_sp, 1)
+  }
+  return(score/n_sites)
+}
+dataset <- c("sim", "Mosquitos","Eucalypts","Frogs","Fungi", "Aravo", "Mites")
+pkg <- c("boral", "Hmsc", "jSDM")
+sensitivity <- specificity <- matrix(NA,3,7)
+dimnames(sensitivity) <- dimnames(specificity) <- list(pkg,dataset)
+for(d in 1:length(dataset)){
+  for(p in 1:length(pkg)){
+    if(d==1){
+    PA <- Y
+    } else{
+    PA <- eval(parse(text=paste0("PA_", dataset[d])), env=.GlobalEnv)
+    }
+    if(p==3){
+    mod <- eval(parse(text=paste0("mod_", pkg[p], "_", dataset[d])), env=.GlobalEnv)
+    theta <- mod$theta_latent
+    } else{
+    theta <- eval(parse(text=paste0(pkg[p], "_theta_latent_", dataset[d])),
+                  env=.GlobalEnv)
+    }
+    specificity[p,d] <- Specificity(PA, theta)
+    sensitivity[p,d] <- Sensitivity(PA, theta)
+  }
+}
+
+save(T_jSDM_sim, Deviance_jSDM_sim, RMSE_jSDM_sim, T_jSDM_Mosquitos, Deviance_jSDM_Mosquitos ,T_jSDM_Eucalypts, Deviance_jSDM_Eucalypts, T_jSDM_Frogs, Deviance_jSDM_Frogs,T_jSDM_Fungi, Deviance_jSDM_Fungi, T_jSDM_Aravo, Deviance_jSDM_Aravo, T_jSDM_Mites, Deviance_jSDM_Mites,
+     RMSE_boral_sim, T_boral_sim, Deviance_boral_sim, T_boral_Mosquitos, Deviance_boral_Mosquitos, T_boral_Eucalypts, Deviance_boral_Eucalypts, T_boral_Frogs, Deviance_boral_Frogs, T_boral_Fungi, Deviance_boral_Fungi, T_boral_Aravo, Deviance_boral_Aravo, T_boral_Mites, Deviance_boral_Mites,
+     RMSE_Hmsc_sim, T_Hmsc_sim, Deviance_Hmsc_sim, T_Hmsc_Mosquitos, Deviance_Hmsc_Mosquitos, T_Hmsc_Eucalypts, Deviance_Hmsc_Eucalypts, T_Hmsc_Frogs, Deviance_Hmsc_Frogs, T_Hmsc_Fungi, Deviance_Hmsc_Fungi, T_Hmsc_Aravo, Deviance_Hmsc_Aravo, T_Hmsc_Mites, Deviance_Hmsc_Mites, sensitivity, specificity,
+     file="jSDM_boral_Hmsc_files/jSDM-boral-Hmsc-comparison.rda")
+```
+
+
+Then we compare the compilation time and the results obtained with each package.  
+
+## Compilation time, deviance and predictive performance
+
+```{r time-deviance, echo=FALSE, eval=TRUE, out.width=900, cache=FALSE}
+library(kableExtra)
+## Data-sets overview and model fitting with each package
+load("jSDM_boral_Hmsc_files/jSDM-boral-Hmsc-comparison.rda")
+result <- matrix(NA,26,8)
+colnames(result) <- c(" ","Simulated", "Mosquitos", "Eucalypts", "Frogs", "Fungi", "Aravo", "Mites") 
+result[3, 2:8] <- c(300, nrow(mosquitos), nrow(Env_Eucalypts), nrow(frogs), nrow(Env_Fungi),  nrow(PA_Aravo), nrow(mites))
+result[4, 2:8] <- c(100, ncol(PA_Mosquitos), ncol(PA_Eucalypts), ncol(PA_Frogs), ncol(PA_Fungi), ncol(PA_Aravo), ncol(PA_Mites))
+result[5, 2:8] <- 2
+result[6, 2:8] <- c(3, ncol(X_Mosquitos), ncol(X_Eucalypts), ncol(X_Frogs), ncol(X_Fungi), ncol(X_Aravo),  ncol(X_Mites))
+result[7, 2:8] <- c(0, 0, 0, 0, 0, ncol(Tr_Aravo), 0)
+result[8, 2:8] <- result[3, 2:8] * result[4, 2:8]
+result[9, 2:8] <- result[3, 2:8]*(1 + result[5, 2:8]) + 1+ result[4, 2:8]*(result[6, 2:8] + result[5, 2:8]) - 1
+result[10, 2:8] <- 20000
+# all interactions traits environment are considered
+result[9, "Aravo"] <- result[9, "Aravo"] + result[6, "Aravo"]*(result[7, "Aravo"] + 1)
+result[11,2:8]=c(T_boral_sim, T_boral_Mosquitos, T_boral_Eucalypts, T_boral_Frogs, T_boral_Fungi, T_boral_Aravo, T_boral_Mites)
+result[12,2:8]=c(T_Hmsc_sim, T_Hmsc_Mosquitos, T_Hmsc_Eucalypts, T_Hmsc_Frogs, T_Hmsc_Fungi,
+             T_Hmsc_Aravo, T_Hmsc_Mites)
+result[13,2:8]=c(T_jSDM_sim, T_jSDM_Mosquitos, T_jSDM_Eucalypts, T_jSDM_Frogs,T_jSDM_Fungi,
+             T_jSDM_Aravo, T_jSDM_Mites)
+result[14,2:8] <- c(Deviance_boral_sim, Deviance_boral_Mosquitos, Deviance_boral_Eucalypts, 
+                Deviance_boral_Frogs, Deviance_boral_Fungi,
+                Deviance_boral_Aravo, Deviance_boral_Mites)
+result[15,2:8] <- c(Deviance_Hmsc_sim, Deviance_Hmsc_Mosquitos, Deviance_Hmsc_Eucalypts, 
+                Deviance_Hmsc_Frogs, Deviance_Hmsc_Fungi,
+                Deviance_Hmsc_Aravo, Deviance_Hmsc_Mites)
+result[16,2:8] <- c(Deviance_jSDM_sim, Deviance_jSDM_Mosquitos, 
+                Deviance_jSDM_Eucalypts, Deviance_jSDM_Frogs, 
+                Deviance_jSDM_Fungi, Deviance_jSDM_Aravo,
+                Deviance_jSDM_Mites)
+result <- apply(result, c(1,2), round, 0)
+min_ratio_jSDM_Hmsc <- round(min(as.numeric(result[12,2:8]/result[13,2:8])),1)
+max_ratio_jSDM_Hmsc <- round(max(as.numeric(result[12,2:8]/result[13,2:8])),1)
+min_ratio_jSDM_boral <- round(min(as.numeric(result[11,2:8]/result[13,2:8])),1)
+max_ratio_jSDM_boral <- round(max(as.numeric(result[11,2:8]/result[13,2:8])),1)
+min_ratio_boral_Hmsc <- round(min(as.numeric(result[11,2:8]/result[12,2:8])),1)
+max_ratio_boral_Hmsc <- round(max(as.numeric(result[11,2:8]/result[12,2:8])),1)
+
+result[,1] <- c("data type", "distribution", "n.sites","n.species","n.latent","n.col.X", "n.traits", "n.obs", "n.param", "n.mcmc", rep(c("boral","Hmsc","jSDM"), 5), "")
+result[1, 2:8] <-c("presence-absence", "presence-absence", "presence-absence", "presence-absence", "presence-absence", "abundance", "abundance")
+result[2, 2:8] <- c("bernoulli", "bernoulli", "bernoulli", "bernoulli", "bernoulli", "poisson", "poisson")
+sp_pictures <- c("figures/des.jpg",
+                 "figures/Mosquitos.jpg","figures/Eucalyptus.jpg",
+                 "figures/Frogs.jpg","figures/Fungi.jpg",
+                 "figures/alpine_plants_.jpg",
+                 "figures/oribatid_mites_.png")
+result[17:19, 2:8] <- round(sensitivity,2)
+result[20:22, 2:8] <- round(specificity,2)
+result[23:25, 2:8] <- round(specificity + sensitivity -1,2)
+result[26, 2:8] <- sprintf('![](%s){height="80px" width="80px"}', sp_pictures)
+#result[26, 2:8] <- sprintf('\\includegraphics{%s}', sp_pictures)
+
+kable(result, booktabs=TRUE, align='c') %>%
+      column_spec(1, bold=TRUE, width="2.5cm") %>%
+      group_rows("Computation \n time (secondes)", 11, 13, underline = TRUE) %>%
+      group_rows("Deviance", 14, 16, underline = TRUE) %>%
+      group_rows("Sensitivity", 17, 19, underline = TRUE) %>%
+      group_rows("Specificity", 20, 22, underline = TRUE) %>%
+      group_rows("TSS", 23, 25, underline = TRUE) %>%
+  kable_styling(bootstrap_options="striped", latex_options=c("HOLD_position","striped"), full_width=FALSE)
+```
+
+`Hmsc` is **`r min_ratio_boral_Hmsc` to `r max_ratio_boral_Hmsc`** times faster than `boral`.
+
+`jSDM` is **`r min_ratio_jSDM_Hmsc` to `r max_ratio_jSDM_Hmsc`** times faster than `Hmsc` and **`r min_ratio_jSDM_boral` to `r max_ratio_jSDM_boral`** times faster than `boral`.
+
+## Root-Mean-Square Error (RMSE) for simulated data
+
+Computed for the probabilities of presences $\theta_{ij}$ with the simulated data-set.
+
+```{r RMSE, eval=TRUE, echo=FALSE, cache=FALSE}
+
+result <- data.frame(matrix(NA,1,3),row.names=  c("RMSE"))
+colnames(result) <- c("Hmsc", "boral","jSDM")
+result$boral <- RMSE_boral_sim
+result$jSDM <- RMSE_jSDM_sim
+result$Hmsc <- RMSE_Hmsc_sim
+kable(result, digits=3, booktabs=TRUE, align='c') %>%
+  kable_styling(bootstrap_options = "striped", 
+                latex_options= c("HOLD_position","striped"),
+                full_width = FALSE)
+```
+
+## Sampler efficiency 
+
+The number of effective values sampled per second measures the sampler's efficiency for each package. 
+The effective sample size (ESS), is computed for each parameter, using the function [`effectiveSize`](https://www.rdocumentation.org/packages/coda/versions/0.19-4/topics/effectiveSize) from package `coda`. We assume that sampling time (T.sample) corresponds to half of the computation time because the same number of sampling iterations (n.sample) and burn-in (n.burnin) iterations was performed to fit the models. To reduce the auto-correlation of the MCMCs, only one in n.thin of the sampling iterations was retained and a sample of size: sample.size, is returned for each parameter. To obtain de number of effective values sampled per second, in total or for the species intercept $\beta_0$, the species effect $\beta$, the factor loadings $\lambda$ and the latent variables $W$,  the sum of the ESSs computed for all parameters, or the average of ESSs for each kind of parameters, is divided by the sampling time in seconds.
+
+```{r neff, echo=FALSE, eval=FALSE}
+# compute effective sample size: neff/s with coda method
+suffix <- c("sim", "Mosquitos","Eucalypts","Frogs","Fungi", "Aravo", "Mites")
+# jSDM
+jSDM_neff <- matrix(NA,7,5)
+colnames(jSDM_neff) <- c("beta0","beta","lambda","W","Total")
+rownames(jSDM_neff) <- suffix
+for(i in 1:length(suffix)){
+  mod <- eval(parse(text=paste0("mod_jSDM_", suffix[i])), env=.GlobalEnv)
+  # Sampling time correspond to the half of total compilation time 
+  # because n.burnin=n.mcmc=10000
+  T_sampling <- as.numeric(eval(parse(text=paste0("T_jSDM_", suffix[i])), env=.GlobalEnv))/2
+  neff_sp <- matrix(unlist(lapply(mod$mcmc.sp,coda::effectiveSize)),
+                    nrow=length(mod$mcmc.sp), byrow=TRUE)
+  colnames(neff_sp) <- colnames(mod$mcmc.sp[[1]])
+  neff_beta <- neff_sp[, grep("beta", colnames(neff_sp))]
+  jSDM_neff[i,"beta0"] <- round(mean(neff_beta[,1])/T_sampling)
+  jSDM_neff[i,"beta"] <- round(mean(neff_beta[,-1])/T_sampling)
+  neff_lambda <- neff_sp[,grep("lambda",colnames(neff_sp))]
+  # set to NA neff for triangular superior lambda constrained to zero 
+  neff_lambda[1,2] <- NA
+  jSDM_neff[i,"lambda"] <- round(mean(neff_lambda, na.rm=TRUE)/T_sampling)
+  neff_lv <- matrix(unlist(lapply(mod$mcmc.latent,coda::effectiveSize)),
+                    ncol=ncol(mod$mcmc.latent[[1]]), byrow=TRUE)
+  jSDM_neff[i,"W"] <- round(mean(neff_lv)/T_sampling)
+  jSDM_neff[i, "Total"] <- round(mean(c(c(neff_beta),
+                                        c(neff_lambda),
+                                        c(neff_lv)), na.rm=TRUE)/T_sampling)
+}
+
+# Hmsc
+Hmsc_neff <- matrix(NA,7,5)
+colnames(Hmsc_neff) <- c("beta0","beta","lambda","W","Total")
+rownames(Hmsc_neff) <- suffix
+for(i in 1:length(suffix)){
+  mod <- eval(parse(text=paste0("mod_Hmsc_", suffix[i])), env=.GlobalEnv)
+  # Sampling time correspond to the half of total compilation time 
+  # because n.burnin=n.mcmc=10000
+  T_sampling <- as.numeric(eval(parse(text=paste0("T_Hmsc_", suffix[i])), env=.GlobalEnv))/2
+  codaObject <- Hmsc::convertToCodaObject(mod, start=1)
+  neff_beta <- matrix(coda::effectiveSize(codaObject[["Beta"]]),
+                      nrow=mod$ns, byrow=TRUE)
+  Hmsc_neff[i,"beta0"] <- round(mean(neff_sp[,1])/T_sampling)
+  Hmsc_neff[i,"beta"] <- round(mean(neff_beta[,-1])/T_sampling)
+  neff_lambda <- matrix(coda::effectiveSize(codaObject[["Lambda"]][[1]]),
+                        nrow=mod$ns)
+  Hmsc_neff[i,"lambda"] <- round(mean(neff_lambda)/T_sampling)
+  neff_lv <- matrix(coda::effectiveSize(codaObject[["Eta"]][[1]]),
+                    ncol=mod$np, byrow=TRUE)
+  Hmsc_neff[i,"W"] <- round(mean(neff_lv)/T_sampling)
+  Hmsc_neff[i, "Total"] <- round(mean(c(c(neff_beta),
+                                        c(neff_lambda),
+                                        c(neff_lv)))/T_sampling)
+}
+# boral 
+boral_neff <- matrix(NA,7,5)
+colnames(boral_neff) <- c("beta0","beta","lambda","W","Total")
+rownames(boral_neff) <- suffix
+for(i in 1:length(suffix)){
+  mod <- eval(parse(text=paste0("mod_boral_", suffix[i])), env=.GlobalEnv)
+  # Sampling time correspond to the half of total compilation time 
+  # because n.burnin=n.mcmc=10000
+  T_sampling <- as.numeric(eval(parse(text=paste0("T_boral_", suffix[i])), env=.GlobalEnv))/2
+  
+  codaObject <- boral::get.mcmcsamples(mod)
+  codaObject <- codaObject[, grep("deviance",colnames(codaObject), invert=TRUE)]
+  neff <- coda::effectiveSize(codaObject)
+  neff_lv <- matrix(neff[grep("lvs", names(neff))], 
+                         ncol=mod$n, byrow=TRUE)
+  boral_neff[i,"W"] <- round(mean(neff_lv)/T_sampling)
+  neff_beta <- matrix(neff[grep("X.coefs", names(neff))], 
+                    nrow=mod$p, byrow=FALSE)
+  boral_neff[i,"beta"] <- round(mean(neff_beta)/T_sampling) 
+  neff_lambda <- matrix(neff[grep("lv.coefs", names(neff))], 
+                        nrow=mod$p, byrow=FALSE)
+  # set to NA neff for triangular superior lambda constrained to zero 
+  neff_lambda[1,3] <- NA
+  boral_neff[i,"beta0"]<-  round(mean(neff_lambda[,1])/T_sampling)
+  boral_neff[i,"lambda"] <- round(mean(neff_lambda[,-1], na.rm=TRUE)/T_sampling)
+  boral_neff[i, "Total"] <- round(mean(c(c(neff_beta),
+                                        c(neff_lambda),
+                                        c(neff_lv)), na.rm=TRUE)/T_sampling)
+}
+save(boral_neff, Hmsc_neff, jSDM_neff, file="jSDM_boral_Hmsc_files/jSDM-boral-Hmsc-neff.rda")
+```
+
+```{r neff-table, echo=FALSE, eval=TRUE, out.width=900, cache=FALSE}
+load(file="jSDM_boral_Hmsc_files/jSDM-boral-Hmsc-neff.rda")
+## Number of effective sampling values by second for each package
+result <- as.data.frame(matrix(NA,23,8))
+colnames(result) <- c(" ","Simulated", "Mosquitos", "Eucalypts", "Frogs", "Fungi", "Aravo", "Mites")
+result[, 1] <- c("n.burnin", "n.sample", "n.thin", "sample.size",  rep(c("boral","Hmsc","jSDM"), 6), "")
+result[1,2:8] <- 10000
+result[2,2:8] <- 10000
+result[3,2:8] <- 10
+result[4,2:8] <- 1000
+result[5,2:8] <- round(c(T_boral_sim, T_boral_Mosquitos, T_boral_Eucalypts, T_boral_Frogs, T_boral_Fungi, T_boral_Aravo, T_boral_Mites)/2)
+result[6,2:8]= round(c(T_Hmsc_sim, T_Hmsc_Mosquitos, T_Hmsc_Eucalypts, T_Hmsc_Frogs, T_Hmsc_Fungi,
+             T_Hmsc_Aravo, T_Hmsc_Mites)/2)
+result[7,2:8]= round(c(T_jSDM_sim, T_jSDM_Mosquitos, T_jSDM_Eucalypts, T_jSDM_Frogs,T_jSDM_Fungi,
+             T_jSDM_Aravo, T_jSDM_Mites)/2)
+pkg <- c("boral", "Hmsc", "jSDM")
+l <- 7
+for(p in 1:ncol(jSDM_neff)){
+  for(n in 1:length(pkg)){
+    result[n + l, 2:8] <- eval(parse(text=paste0(pkg[n], "_neff")), env=.GlobalEnv)[,p]
+  }
+  l <- l + length(pkg)
+}
+sp_pictures <- c("figures/des.jpg",
+                 "figures/Mosquitos.jpg","figures/Eucalyptus.jpg",
+                 "figures/Frogs.jpg","figures/Fungi.jpg",
+                 "figures/alpine_plants_.jpg",
+                 "figures/oribatid_mites_.png")
+result[23, 2:8] <- sprintf('![](%s){height="80px" width="80px"}', sp_pictures)
+
+kable(result, booktabs=TRUE, align=c('l', rep('r',7))) %>%
+      row_spec(0, bold=TRUE, align='c') %>%
+      column_spec(1, bold=TRUE, width="2cm") %>%
+      group_rows("T.sample (s)", 5, 7) %>%
+      group_rows("Species intercept: $\\beta_0$", 8, 10) %>%
+      group_rows("Species effects: $\\beta$", 11, 13) %>%
+      group_rows("Factor loadings: $\\lambda$", 14, 16) %>%
+      group_rows("Latent variables: $W$", 17, 19) %>%
+      group_rows("Total", 20, 22) %>%
+  kable_styling(bootstrap_options="striped",
+                latex_options=c("HOLD_position","striped")) 
+
+## Number of effective sampling values by second for each package 
+# datasets in rows
+# result <- matrix(NA,8,16)
+# rownames(result) <- c(" ","Simulated", "Mosquitos", "Eucalypts", "Frogs", "Fungi", "Aravo", "Mites")
+# result[1,] <- c(rep(c("$\\beta_0$","$\\beta$","$\\lambda$", "$W$", "Total"), 3), "")
+# pkg <- c("boral", "Hmsc", "jSDM")
+# l <- 0
+# for(n in 1:length(pkg)){
+#   for(p in 1:ncol(jSDM_neff)){
+#     result[2:8, p + l] <- eval(parse(text=paste0(pkg[n], "_neff")), env=.GlobalEnv)[,p]
+#   }
+#   l <- l + ncol(jSDM_neff)
+# }
+# sp_pictures <- c("figures/des.jpg",
+#                  "figures/Mosquitos.jpg","figures/Eucalyptus.jpg",
+#                  "figures/Frogs.jpg","figures/Fungi.jpg",
+#                  "figures/alpine_plants_.jpg",
+#                  "figures/oribatid_mites_.png")
+# result[2:8, 16] <- sprintf('![](%s){height="80px" width="80px"}', sp_pictures)
+# 
+# kable(result, booktabs=TRUE, align='c') %>%
+#       column_spec(1, bold=TRUE, width="4cm") %>%
+#       add_header_above(c(" "=1, "boral"=5, "Hmsc"=5, "jSDM"=5, " "=1)) %>%
+#   kable_styling(bootstrap_options="striped", latex_options=c("HOLD_position","striped"), full_width=FALSE)
+```
+
+## Estimated  Parameters
+
+### Simulated dataset
+
+#### `jSDM` and `boral`
+
+We plot the parameters estimated with `jSDM` against those estimated with `boral` to compare the results obtained with both packages. 
+
+```{r jSDM-boral-simulation}
+print(paste(nrow(Y),"sites and ", ncol(Y)," species"), quote = FALSE)
+np <- ncol(X)
+nsp <- mod_boral_sim$p
+# species fixed effect beta
+jSDM_beta <- matrix(0,nsp,np)
+for (j in 1:nsp){
+  for (p in 1:np){
+    jSDM_beta[j,p] <- mean(mod_jSDM_sim$mcmc.sp[[j]][,p])
+  }
+}
+boral_beta <- cbind(mod_boral_sim$lv.coefs.mean[,"beta0"],
+                    mod_boral_sim$X.coefs.mean)
+par(mfrow=c(1,2))
+plot(boral_beta,jSDM_beta,
+     xlab="fitted by boral", ylab="fitted by jSDM",
+     main="Fixed species effect beta")
+abline(a=0,b=1,col='red')
+
+# factor loadings lambda
+jSDM_lambda <- matrix(0,nsp,nl)
+for (j in 1:nsp){
+  for (l in 1:nl){
+    jSDM_lambda[j,l] <- mean(mod_jSDM_sim$mcmc.sp[[j]][,np+l])
+  }
+}
+boral_lambda <- mod_boral_sim$lv.coefs.mean[,-1]
+
+plot(boral_lambda,jSDM_lambda,
+     xlab="fitted by boral", ylab="fitted by jSDM",
+     main="Loading factors lambda")
+abline(a=0,b=1,col='red')
+
+# Ws
+jSDM_lvs <- matrix(0,nsite,nl)
+for (l in 1:nl){
+  jSDM_lvs[,l] <- colMeans(mod_jSDM_sim$mcmc.latent[[paste0("lv_",l)]])
+}
+plot(mod_boral_sim$lv.mean, jSDM_lvs,
+     xlab="fitted by boral", ylab="fitted by jSDM",
+     main="Latent variables W")
+abline(a=0,b=1,col='red')
+
+# W.Lambda
+plot(mod_boral_sim$lv.mean %*% t(boral_lambda) ,
+     jSDM_lvs %*% t(jSDM_lambda),
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="W.Lambda")
+abline(a=0,b=1,col='red') 
+
+# Residual correlation Matrix
+R.target <- cov2cor(t(lambda.target) %*% lambda.target)
+RMSE_R_jSDM <- RMSE_R_boral <- 0
+boral_R <- boral::get.residual.cor(mod_boral_sim, est="mean")$cor
+jSDM_R <- jSDM::get_residual_cor(mod_jSDM_sim)$cor.mean
+RMSE_R_jSDM <- sqrt(sum((R.target-jSDM_R)^2)/(nsp*nsp))
+RMSE_R_boral <-  sqrt(sum((R.target-boral_R)^2)/(nsp*nsp))
+plot(R.target, boral_R, col="black",  pch="o",
+     main="Residual correlation matrix R",
+     xlab="obs", ylab="fitted")
+points(R.target, jSDM_R,  pch=5, 
+       col=scales::alpha("blue",alpha = 0.6))
+legend("topleft", pch=c(5,1), bty="n", col=c("blue","black"), cex=0.8,
+       c(paste("fitted by jSDM, RMSE: ", round(RMSE_R_jSDM,2)),
+         paste("fitted by boral, RMSE: ", round(RMSE_R_boral,2))))
+abline(a=0,b=1, col='red')
+
+# Predictions 
+plot(boral_probit_theta_latent_sim,
+     mod_jSDM_sim$probit_theta_latent,
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main=" probit(theta)")
+abline(a=0,b=1,col='red')
+plot(boral_theta_latent_sim,
+     mod_jSDM_sim$theta_latent,
+     xlab="fitted by boral",
+     ylab="fitted by jSDM", main=" theta")
+abline(a=0,b=1,col='red')
+```
+
+```{r jSDM-boral-simulation-plot, echo=FALSE, eval=TRUE, out.width=800}
+knitr::include_graphics(paste0("jSDM_boral_Hmsc_files/figure-html/jSDM-boral-simulation-", 1:4, ".png"))
+```
+
+#### `jSDM` and `Hmsc`
+
+We plot the parameters estimated with `jSDM` against those estimated with `Hmsc` to compare the results obtained with both packages. 
+
+```{r jSDM-Hmsc-simulation}
+np <- ncol(X)
+print(paste(nrow(Y),"sites and ", ncol(Y)," species"), quote = FALSE)
+# species fixed effect beta
+Hmsc_beta <- t(getPostEstimate(hM=mod_Hmsc_sim, parName='Beta')$mean)
+jSDM_beta <- matrix(0,nsp,np)
+for (j in 1:nsp){
+  for (p in 1:np){
+    jSDM_beta[j,p] <- mean(mod_jSDM_sim$mcmc.sp[[j]][,p])
+  }
+}
+par(mfrow=c(1,2))
+plot(Hmsc_beta, jSDM_beta,
+     xlab="fitted by Hmsc", ylab="fitted by jSDM",
+     main="Fixed species effect beta")
+abline(a=0,b=1,col='red')
+
+# factor loadings lambda
+jSDM_lambda <- matrix(0,nsp,nl)
+for (j in 1:nsp){
+  for (l in 1:nl){
+    jSDM_lambda[j,l] <- mean(mod_jSDM_sim$mcmc.sp[[j]][,np+l])
+  }
+}
+Hmsc_lambda <- t(getPostEstimate(hM=mod_Hmsc_sim, parName='Lambda')$mean)
+
+plot(Hmsc_lambda,jSDM_lambda,
+     xlab="fitted by Hmsc", ylab="fitted by jSDM",
+     main="Loading factors lambda")
+abline(a=0,b=1,col='red')
+
+# Ws
+Hmsc_lvs <- getPostEstimate(hM=mod_Hmsc_sim, parName='Eta')$mean
+jSDM_lvs <- matrix(0,nsite,nl)
+for (l in 1:nl){
+  jSDM_lvs[,l] <- colMeans(mod_jSDM_sim$mcmc.latent[[paste0("lv_",l)]])
+}
+plot(Hmsc_lvs, jSDM_lvs,
+     xlab="fitted by Hmsc", ylab="fitted by jSDM",
+     main="Latent variables W")
+abline(a=0,b=1,col='red')
+
+# W.Lambda
+plot(Hmsc_lvs %*% t(Hmsc_lambda) ,
+     jSDM_lvs %*% t(jSDM_lambda),
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="W.Lambda")
+abline(a=0,b=1,col='red') 
+
+# Residual correlation Matrix
+Hmsc_R <- Hmsc::computeAssociations(mod_Hmsc_sim)[[1]]$mean
+jSDM_R <- jSDM::get_residual_cor(mod_jSDM_sim)$cor.mean
+R.target <- cov2cor(t(lambda.target) %*% lambda.target)
+RMSE_R_jSDM <- RMSE_R_Hmsc <- 0
+RMSE_R_jSDM <- sqrt(sum((R.target-jSDM_R)^2)/(nsp*nsp))
+RMSE_R_Hmsc <- sqrt(sum((R.target-Hmsc_R)^2)/(nsp*nsp))
+
+plot(R.target, Hmsc_R,
+     main="Residual correlation matrix R",
+     xlab="obs", ylab="fitted")
+points(R.target, jSDM_R, pch=5, 
+       col=scales::alpha("blue", alpha = 0.6))
+legend("topleft", pch=c(5,1), bty="n", col=c("blue","black"), cex=0.8,
+       c(paste("fitted by jSDM, RMSE: ", round(RMSE_R_jSDM,2)),
+         paste("fitted by Hmsc, RMSE: ", round(RMSE_R_Hmsc,2))))
+abline(a=0,b=1, col='red')
+
+# Predictions 
+plot(Hmsc_probit_theta_latent_sim,
+     mod_jSDM_sim$probit_theta_latent,
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="probit(theta)")
+abline(a=0,b=1,col='red')
+plot(Hmsc_theta_latent_sim,
+     mod_jSDM_sim$theta_latent,
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="theta")
+abline(a=0,b=1,col='red')
+```
+
+```{r jSDM-Hmsc-simulation-plot, echo=FALSE, eval=TRUE, out.width=800}
+knitr::include_graphics(paste0("jSDM_boral_Hmsc_files/figure-html/jSDM-Hmsc-simulation-", 1:4, ".png"))
+```
+
+### Mosquitos dataset
+
+#### `jSDM` and `boral`
+
+We plot the parameters estimated with `jSDM` against those estimated with `boral` to compare the results obtained with both packages. 
+
+
+```{r jSDM-boral-mosquitos}
+
+# Import center and reduce Mosquito data-set
+data(mosquitos, package="jSDM")
+PA_Mosquitos <- mosquitos[,1:16]
+
+print(paste(nrow(PA_Mosquitos),"sites and ",ncol(PA_Mosquitos)," species"),quote = FALSE)
+nsp <- ncol(mod_jSDM_Mosquitos$model_spec$presence_data)
+nsite <- nrow(mod_jSDM_Mosquitos$model_spec$presence_data)
+nl <- mod_jSDM_Mosquitos$model_spec$n_latent
+np <- nrow(mod_jSDM_Mosquitos$model_spec$beta_start)
+
+# species fixed effect beta
+jSDM_beta <- matrix(0,nsp,np)
+for (j in 1:nsp){
+  jSDM_beta[j,] <- apply(mod_jSDM_Mosquitos$mcmc.sp[[j]],2,mean)[1:np]
+}
+boral_beta <- cbind(mod_boral_Mosquitos$lv.coefs.mean[,"beta0"],
+                    mod_boral_Mosquitos$X.coefs.mean)
+par(mfrow=c(1,2))
+plot(boral_beta,jSDM_beta,
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="Fixed species effect beta")
+abline(a=0,b=1,col='red')
+
+# factor loadings lambda
+jSDM_lambda <- matrix(0,nsp,nl)
+for (j in 1:nsp){
+  jSDM_lambda[j,] <- apply(mod_jSDM_Mosquitos$mcmc.sp[[j]],2,mean)[(np+1):(np+nl)]
+}
+boral_lambda <- mod_boral_Mosquitos$lv.coefs.mean[,-1]
+
+plot(boral_lambda,jSDM_lambda,
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="Loading factors lambda")
+abline(a=0,b=1,col='red')
+
+# Ws
+jSDM_lvs <- matrix(0,nsite,nl)
+for (l in 1:nl){
+  jSDM_lvs[,l] <- apply(mod_jSDM_Mosquitos$mcmc.latent[[paste0("lv_",l)]],2,mean)
+}
+plot(mod_boral_Mosquitos$lv.mean,
+     jSDM_lvs, xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="Latent variables W")
+abline(a=0,b=1,col='red')
+
+# W.Lambda
+plot(mod_boral_Mosquitos$lv.mean %*% t(boral_lambda) ,
+     jSDM_lvs %*% t(jSDM_lambda),
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="W.Lambda")
+abline(a=0,b=1,col='red') 
+
+# Residual correlation Matrix
+boral_R <- boral::get.residual.cor(mod_boral_Mosquitos, est="mean")$cor
+jSDM_R <- jSDM::get_residual_cor(mod_jSDM_Mosquitos)$cor.mean
+
+plot(boral_R,jSDM_R,
+     main="Residual correlation matrix R ",
+     xlab="fitted by boral", ylab="fitted by jSDM")
+abline(a=0,b=1, col='red')
+
+# Predictions 
+plot(boral_probit_theta_latent_Mosquitos,
+     mod_jSDM_Mosquitos$probit_theta_latent, 
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main=" probit(theta)")
+abline(a=0,b=1,col='red')
+plot(boral_theta_latent_Mosquitos,
+     mod_jSDM_Mosquitos$theta_latent, 
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main=" theta")
+abline(a=0,b=1,col='red')
+```
+
+
+```{r jSDM-boral-mosquitos-plot, echo=FALSE, eval=TRUE, out.width=800}
+knitr::include_graphics(paste0("jSDM_boral_Hmsc_files/figure-html/jSDM-boral-mosquitos-", 1:4, ".png"))
+```
+
+#### `jSDM` and `Hmsc`
+
+We plot the parameters estimated with `jSDM` against those estimated with `Hmsc` to compare the results obtained with both packages. 
+
+```{r jSDM-Hmsc-mosquitos}
+# Import center and reduce Mosquito data-set
+data(mosquitos, package="jSDM")
+PA_Mosquitos <- mosquitos[,1:16]
+
+print(paste(nrow(PA_Mosquitos),"sites and ",ncol(PA_Mosquitos)," species"),quote = FALSE)
+nsp <- ncol(mod_jSDM_Mosquitos$model_spec$presence_data)
+nsite <- nrow(mod_jSDM_Mosquitos$model_spec$presence_data)
+nl <- mod_jSDM_Mosquitos$model_spec$n_latent
+np <- nrow(mod_jSDM_Mosquitos$model_spec$beta_start)
+
+# species fixed effect beta
+jSDM_beta <- matrix(0,nsp,np)
+for (j in 1:nsp){
+  jSDM_beta[j,] <- apply(mod_jSDM_Mosquitos$mcmc.sp[[j]],2,mean)[1:np]
+}
+Hmsc_beta <- t(getPostEstimate(hM=mod_Hmsc_Mosquitos, parName='Beta')$mean)
+par(mfrow=c(1,2))
+plot(Hmsc_beta,jSDM_beta,
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="Fixed species effect beta")
+abline(a=0,b=1,col='red')
+
+# factor loadings lambda
+jSDM_lambda <- matrix(0,nsp,nl)
+for (j in 1:nsp){
+  jSDM_lambda[j,] <- apply(mod_jSDM_Mosquitos$mcmc.sp[[j]],2,mean)[(np+1):(np+nl)]
+}
+Hmsc_lambda <- t(getPostEstimate(hM=mod_Hmsc_Mosquitos, parName='Lambda')$mean)
+
+plot(Hmsc_lambda, jSDM_lambda,
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="Loading factors lambda")
+abline(a=0,b=1,col='red')
+
+# Ws
+jSDM_lvs <- matrix(0,nsite,nl)
+for (l in 1:nl){
+  jSDM_lvs[,l] <- apply(mod_jSDM_Mosquitos$mcmc.latent[[paste0("lv_",l)]],2,mean)
+}
+Hmsc_lvs <- getPostEstimate(hM=mod_Hmsc_Mosquitos, parName='Eta')$mean
+plot(Hmsc_lvs, jSDM_lvs,
+     xlab="fitted by Hmsc", ylab="fitted by jSDM",
+     main="Latent variables W")
+abline(a=0,b=1,col='red')
+
+# W.Lambda
+plot(Hmsc_lvs %*% t(Hmsc_lambda),
+     jSDM_lvs %*% t(jSDM_lambda),
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="W.Lambda")
+abline(a=0,b=1,col='red') 
+
+# Residual correlation Matrix
+Hmsc_R <- Hmsc::computeAssociations(mod_Hmsc_Mosquitos)[[1]]$mean
+jSDM_R <- jSDM::get_residual_cor(mod_jSDM_Mosquitos)$cor.mean
+plot(Hmsc_R,jSDM_R, 
+     main="Residual correlation matrix R",
+     xlab="fitted by Hmsc", ylab="fitted by jSDM")
+abline(a=0,b=1, col='red')
+
+# Predictions 
+plot(Hmsc_probit_theta_latent_Mosquitos,
+     mod_jSDM_Mosquitos$probit_theta_latent,
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="probit(theta)")
+abline(a=0,b=1,col='red')
+plot(Hmsc_theta_latent_Mosquitos,
+     mod_jSDM_Mosquitos$theta_latent,
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="theta")
+abline(a=0,b=1,col='red')
+```
+
+
+```{r jSDM-Hmsc-mosquitos-plot, echo=FALSE, eval=TRUE, out.width=800}
+knitr::include_graphics(paste0("jSDM_boral_Hmsc_files/figure-html/jSDM-Hmsc-mosquitos-", 1:4, ".png"))
+```
+
+### Eucalypts dataset
+
+#### `jSDM` and `boral`
+
+We plot the parameters estimated with `jSDM` against those estimated with `boral` to compare the results obtained with both packages. 
+
+
+```{r jSDM-boral-Eucalypts}
+# Import center and reduce Eucalypts data-set
+data(eucalypts, package="jSDM")
+PA_Eucalypts <- eucalypts[,1:12]
+# Remove sites where none species was recorded
+PA_Eucalypts<- PA_Eucalypts[rowSums(PA_Eucalypts) != 0,]
+print(paste(nrow(PA_Eucalypts),"sites and ",ncol(PA_Eucalypts)," species"),quote = FALSE)
+nsp <- ncol(mod_jSDM_Eucalypts$model_spec$presence_data)
+nsite <- nrow(mod_jSDM_Eucalypts$model_spec$presence_data)
+nl <- mod_jSDM_Eucalypts$model_spec$n_latent
+np <- nrow(mod_jSDM_Eucalypts$model_spec$beta_start)
+
+# species fixed effect beta
+jSDM_beta <- matrix(0,nsp,np)
+for (j in 1:nsp){
+  jSDM_beta[j,] <- apply(mod_jSDM_Eucalypts$mcmc.sp[[j]],2,mean)[1:np]
+}
+boral_beta <- cbind(mod_boral_Eucalypts$lv.coefs.mean[,"beta0"],mod_boral_Eucalypts$X.coefs.mean)
+par(mfrow=c(1,2))
+plot(boral_beta, jSDM_beta,
+     xlab="fitted by boral",
+     ylab="fitted by jSDM", 
+     main="Fixed species effect beta")
+abline(a=0,b=1,col='red')
+
+# factor loadings lambda
+jSDM_lambda <- matrix(0,nsp,nl)
+for (j in 1:nsp){
+  jSDM_lambda[j,] <- apply(mod_jSDM_Eucalypts$mcmc.sp[[j]],2,mean)[(np+1):(np+nl)]
+}
+boral_lambda <- mod_boral_Eucalypts$lv.coefs.mean[,-1]
+
+plot(boral_lambda,jSDM_lambda,
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="Loading factors lambda")
+abline(a=0,b=1,col='red')
+
+# Ws
+jSDM_lvs <- matrix(0,nsite,nl)
+for (l in 1:nl){
+  jSDM_lvs[,l] <- apply(mod_jSDM_Eucalypts$mcmc.latent[[paste0("lv_",l)]],2,mean)
+}
+plot(mod_boral_Eucalypts$lv.mean, jSDM_lvs,
+     xlab="fitted by boral", ylab="fitted by jSDM",
+     main="Latent variables W")
+abline(a=0,b=1,col='red')
+
+# W.Lambda
+plot(mod_boral_Eucalypts$lv.mean %*% t(boral_lambda) ,
+     jSDM_lvs %*% t(jSDM_lambda),
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="W.Lambda")
+abline(a=0,b=1,col='red') 
+
+# Residual correlation Matrix
+boral_R <- boral::get.residual.cor(mod_boral_Eucalypts, est="mean")$cor
+jSDM_R <- jSDM::get_residual_cor(mod_jSDM_Eucalypts)$cor.mean
+
+plot(boral_R,jSDM_R,
+     main="Residual correlation matrix R ",
+     xlab="fitted by boral", ylab="fitted by jSDM")
+abline(a=0,b=1, col='red')
+
+# Predictions 
+plot(boral_probit_theta_latent_Eucalypts,
+     mod_jSDM_Eucalypts$probit_theta_latent,
+     xlab="fitted by boral", ylab="fitted by jSDM",
+     main="probit(theta)")
+abline(a=0,b=1,col='red')
+plot(boral_theta_latent_Eucalypts, 
+     mod_jSDM_Eucalypts$theta_latent,
+     xlab="fitted by boral",
+     ylab="fitted by jSDM", main="theta")
+abline(a=0,b=1,col='red')
+```
+
+```{r jSDM-boral-Eucalypts-plot, echo=FALSE, eval=TRUE, out.width=800}
+knitr::include_graphics(paste0("jSDM_boral_Hmsc_files/figure-html/jSDM-boral-Eucalypts-", 1:4, ".png"))
+```
+
+
+#### `jSDM` and `Hmsc`
+
+We plot the parameters estimated with `jSDM` against those estimated with `Hmsc` to compare the results obtained with both packages. 
+
+```{r jSDM-Hmsc-Eucalypts}
+# Import center and reduce Eucalypts data-set
+data(eucalypts, package="jSDM")
+PA_Eucalypts <- eucalypts[,1:12]
+# Remove sites where none species was recorded
+PA_Eucalypts<- PA_Eucalypts[rowSums(PA_Eucalypts) != 0,]
+print(paste(nrow(PA_Eucalypts),"sites and ",ncol(PA_Eucalypts)," species"),
+      quote = FALSE)
+nsp <- ncol(mod_jSDM_Eucalypts$model_spec$presence_data)
+nsite <- nrow(mod_jSDM_Eucalypts$model_spec$presence_data)
+nl <- mod_jSDM_Eucalypts$model_spec$n_latent
+np <- nrow(mod_jSDM_Eucalypts$model_spec$beta_start)
+
+# species fixed effect beta
+jSDM_beta <- matrix(0,nsp,np)
+for (j in 1:nsp){
+  jSDM_beta[j,] <- apply(mod_jSDM_Eucalypts$mcmc.sp[[j]],2,mean)[1:np]
+}
+par(mfrow=c(1,2))
+Hmsc_beta <- t(getPostEstimate(hM=mod_Hmsc_Eucalypts, parName='Beta')$mean)
+
+plot(Hmsc_beta,jSDM_beta,
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="Fixed species effect beta")
+abline(a=0,b=1,col='red')
+
+# factor loadings lambda
+jSDM_lambda <- matrix(0,nsp,nl)
+for (j in 1:nsp){
+  jSDM_lambda[j,] <- apply(mod_jSDM_Eucalypts$mcmc.sp[[j]],2,mean)[(np+1):(np+nl)]
+}
+Hmsc_lambda <- t(getPostEstimate(hM=mod_Hmsc_Eucalypts, parName='Lambda')$mean)
+
+plot(Hmsc_lambda,jSDM_lambda,
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="Loading factors lambda")
+abline(a=0,b=1,col='red')
+
+# Ws
+jSDM_lvs <- matrix(0,nsite,nl)
+for (l in 1:nl){
+  jSDM_lvs[,l] <- apply(mod_jSDM_Eucalypts$mcmc.latent[[paste0("lv_",l)]],2,mean)
+}
+Hmsc_lvs <- getPostEstimate(hM=mod_Hmsc_Eucalypts, parName='Eta')$mean
+plot(Hmsc_lvs, jSDM_lvs,
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="Latent variables W")
+abline(a=0,b=1,col='red')
+
+# W.Lambda
+plot(Hmsc_lvs %*% t(Hmsc_lambda),
+     jSDM_lvs %*% t(jSDM_lambda),
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="W.Lambda")
+abline(a=0,b=1,col='red') 
+
+# Residual correlation Matrix
+Hmsc_R <- Hmsc::computeAssociations(mod_Hmsc_Eucalypts)[[1]]$mean
+jSDM_R <- jSDM::get_residual_cor(mod_jSDM_Eucalypts)$cor.mean
+
+plot(Hmsc_R,jSDM_R,
+     main="Residual correlation matrix R",
+     xlab="fitted by Hmsc", ylab="fitted by jSDM")
+abline(a=0,b=1, col='red')
+
+# Predictions 
+plot(Hmsc_probit_theta_latent_Eucalypts,
+     mod_jSDM_Eucalypts$probit_theta_latent,
+     xlab="fitted by Hmsc", ylab="fitted by jSDM",
+     main="probit(theta)")
+abline(a=0,b=1,col='red')
+plot(Hmsc_theta_latent_Eucalypts,
+     mod_jSDM_Eucalypts$theta_latent,
+     xlab="fitted by Hmsc", ylab="fitted by jSDM",
+     main="theta")
+abline(a=0,b=1,col='red')
+```
+
+```{r jSDM-Hmsc-Eucalypts-plot, echo=FALSE, eval=TRUE, out.width=800}
+knitr::include_graphics(paste0("jSDM_boral_Hmsc_files/figure-html/jSDM-Hmsc-Eucalypts-", 1:4, ".png"))
+```
+
+### Frogs dataset
+
+#### `jSDM` and `boral`
+
+We plot the parameters estimated with `jSDM` against those estimated with `boral` to compare the results obtained with both packages. 
+
+```{r jSDM-boral-frogs}
+# Import center and reduce Frogs data-set
+data(frogs, package="jSDM")
+PA_Frogs <- frogs[,4:12]
+
+print(paste(nrow(PA_Frogs),"sites and ",ncol(PA_Frogs)," species"),quote = FALSE)
+nsp <- ncol(mod_jSDM_Frogs$model_spec$presence_data)
+nsite <- nrow(mod_jSDM_Frogs$model_spec$presence_data)
+nl <- mod_jSDM_Frogs$model_spec$n_latent
+np <- nrow(mod_jSDM_Frogs$model_spec$beta_start)
+
+# species fixed effect beta
+jSDM_beta <- matrix(0,nsp,np)
+for (j in 1:nsp){
+  jSDM_beta[j,] <- apply(mod_jSDM_Frogs$mcmc.sp[[j]],2,mean)[1:np]
+}
+boral_beta <- cbind(mod_boral_Frogs$lv.coefs.mean[,"beta0"],mod_boral_Frogs$X.coefs.mean)
+
+par(mfrow=c(1,2))
+plot(boral_beta,jSDM_beta, 
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="Fixed species effect beta")
+abline(a=0,b=1,col='red')
+
+# factor loadings lambda
+jSDM_lambda <- matrix(0,nsp,nl)
+for (j in 1:nsp){
+  jSDM_lambda[j,] <- apply(mod_jSDM_Frogs$mcmc.sp[[j]],2,mean)[(np+1):(np+nl)]
+}
+boral_lambda <- mod_boral_Frogs$lv.coefs.mean[,-1]
+
+plot(boral_lambda,jSDM_lambda,
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="Loading factors lambda")
+abline(a=0,b=1,col='red')
+
+# Ws
+jSDM_lvs <- matrix(0,nsite,nl)
+for (l in 1:nl){
+  jSDM_lvs[,l] <- apply(mod_jSDM_Frogs$mcmc.latent[[paste0("lv_",l)]],2,mean)
+}
+plot(mod_boral_Frogs$lv.mean, 
+     jSDM_lvs, xlab="fitted by boral",
+     ylab="fitted by jSDM", 
+     main="Latent variables W")
+abline(a=0,b=1,col='red')
+
+# W.Lambda
+plot(mod_boral_Frogs$lv.mean %*% t(boral_lambda) ,
+     jSDM_lvs %*% t(jSDM_lambda),
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="W.Lambda")
+abline(a=0,b=1,col='red') 
+
+# Residual correlation Matrix
+boral_R <- boral::get.residual.cor(mod_boral_Frogs, est="mean")$cor
+jSDM_R <- jSDM::get_residual_cor(mod_jSDM_Frogs)$cor.mean
+
+plot(boral_R,jSDM_R,
+     main="Residual correlation matrix R ",
+     xlab="fitted by boral", ylab="fitted by jSDM")
+abline(a=0,b=1, col='red')
+
+# Predictions 
+
+plot(boral_probit_theta_latent_Frogs,
+     mod_jSDM_Frogs$probit_theta_latent,
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main=" probit(theta)")
+abline(a=0,b=1,col='red')
+plot(boral_theta_latent_Frogs,
+     mod_jSDM_Frogs$theta_latent,
+     xlab="fitted by boral",
+     ylab="fitted by jSDM", main=" theta")
+abline(a=0,b=1,col='red')
+```
+
+```{r jSDM-boral-frogs-plot, echo=FALSE, out.width=800, eval=TRUE}
+knitr::include_graphics(paste0("jSDM_boral_Hmsc_files/figure-html/jSDM-boral-frogs-", 1:4, ".png"))
+```
+
+
+#### `jSDM` and `Hmsc`
+
+We plot the parameters estimated with `jSDM` against those estimated with `Hmsc` to compare the results obtained with both packages. 
+
+```{r jSDM-Hmsc-frogs}
+# Import center and reduce Frogs data-set
+data(frogs, package="jSDM")
+PA_Frogs <- frogs[,4:12]
+
+print(paste(nrow(PA_Frogs),"sites and ",ncol(PA_Frogs)," species"),quote = FALSE)
+nsp <- ncol(mod_jSDM_Frogs$model_spec$presence_data)
+nsite <- nrow(mod_jSDM_Frogs$model_spec$presence_data)
+nl <- mod_jSDM_Frogs$model_spec$n_latent
+np <- nrow(mod_jSDM_Frogs$model_spec$beta_start)
+
+# species fixed effect beta
+jSDM_beta <- matrix(0,nsp,np)
+for (j in 1:nsp){
+  jSDM_beta[j,] <- apply(mod_jSDM_Frogs$mcmc.sp[[j]],2,mean)[1:np]
+}
+Hmsc_beta <- t(getPostEstimate(hM=mod_Hmsc_Frogs, parName='Beta')$mean)
+par(mfrow=c(1,2))
+plot(Hmsc_beta,jSDM_beta,
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="Fixed species effect beta")
+abline(a=0,b=1,col='red')
+
+# factor loadings lambda
+jSDM_lambda <- matrix(0,nsp,nl)
+for (j in 1:nsp){
+  jSDM_lambda[j,] <- apply(mod_jSDM_Frogs$mcmc.sp[[j]],2,mean)[(np+1):(np+nl)]
+}
+Hmsc_lambda <- t(getPostEstimate(hM=mod_Hmsc_Frogs, parName='Lambda')$mean)
+
+plot(Hmsc_lambda,jSDM_lambda,
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="Loading factors lambda")
+abline(a=0,b=1,col='red')
+
+# Ws
+jSDM_lvs <- matrix(0,nsite,nl)
+for (l in 1:nl){
+  jSDM_lvs[,l] <- apply(mod_jSDM_Frogs$mcmc.latent[[paste0("lv_",l)]],2,mean)
+}
+Hmsc_lvs <- getPostEstimate(hM=mod_Hmsc_Frogs, parName='Eta')$mean
+plot(Hmsc_lvs, jSDM_lvs,
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="Latent variables W")
+abline(a=0,b=1,col='red')
+
+# W.Lambda
+plot(Hmsc_lvs %*% t(Hmsc_lambda),
+     jSDM_lvs %*% t(jSDM_lambda),
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="W.Lambda")
+abline(a=0,b=1,col='red') 
+
+# Residual correlation Matrix
+Hmsc_R <- Hmsc::computeAssociations(mod_Hmsc_Frogs)[[1]]$mean
+jSDM_R <- jSDM::get_residual_cor(mod_jSDM_Frogs)$cor.mean
+plot(Hmsc_R,jSDM_R, 
+     main="Residual correlation matrix R",
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM")
+abline(a=0,b=1, col='red')
+
+# Predictions 
+plot(Hmsc_probit_theta_latent_Frogs,
+     mod_jSDM_Frogs$probit_theta_latent,
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main=" probit(theta)")
+abline(a=0,b=1,col='red')
+plot(Hmsc_theta_latent_Frogs,
+     mod_jSDM_Frogs$theta_latent,
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main=" theta")
+abline(a=0,b=1,col='red')
+```
+
+```{r jSDM-Hmsc-frogs-plot, echo=FALSE, out.width=800, eval=TRUE}
+knitr::include_graphics(paste0("jSDM_boral_Hmsc_files/figure-html/jSDM-Hmsc-frogs-", 1:4, ".png"))
+```
+
+### Fungi dataset
+
+#### `jSDM` and `boral`
+
+We plot the parameters estimated with `jSDM` against those estimated with `boral` to compare the results obtained with both packages. 
+
+```{r jSDM-boral-fungi}
+# Import center and reduce fungi data-set
+data(fungi, package="jSDM")
+Env_Fungi <- cbind(scale(fungi[,c("diam","epi","bark")]),
+                   fungi[,c("dc1","dc2","dc3","dc4","dc5",
+                            "quality3","quality4","ground3","ground4")])
+colnames(Env_Fungi) <- c("diam","epi","bark","dc1","dc2","dc3","dc4","dc5",
+                         "quality3","quality4","ground3","ground4")
+PA_Fungi <- fungi[,c("antser","antsin","astfer","fompin","hetpar","junlut",
+                     "phefer","phenig","phevit","poscae","triabi")]
+Env_Fungi <- Env_Fungi[rowSums(PA_Fungi) != 0,]
+# Remove sites where none species was recorded
+PA_Fungi<- PA_Fungi[rowSums(PA_Fungi) != 0,]
+
+print(paste(nrow(PA_Fungi),"sites and ",ncol(PA_Fungi)," species"),quote = FALSE)
+nsp <- ncol(mod_jSDM_Fungi$model_spec$presence_data)
+nsite <- nrow(mod_jSDM_Fungi$model_spec$presence_data)
+nl <- mod_jSDM_Fungi$model_spec$n_latent
+np <- nrow(mod_jSDM_Fungi$model_spec$beta_start)
+
+# species fixed effect beta
+jSDM_beta <- matrix(0,nsp,np)
+for (j in 1:nsp){
+  jSDM_beta[j,] <- apply(mod_jSDM_Fungi$mcmc.sp[[j]],2,mean)[1:np]
+}
+boral_beta <- cbind(mod_boral_Fungi$lv.coefs.mean[,"beta0"],mod_boral_Fungi$X.coefs.mean)
+
+par(mfrow=c(1,2))
+plot(boral_beta,jSDM_beta, 
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="Fixed species effect beta")
+abline(a=0,b=1,col='red')
+
+# factor loadings lambda
+jSDM_lambda <- matrix(0,nsp,nl)
+for (j in 1:nsp){
+  jSDM_lambda[j,] <- apply(mod_jSDM_Fungi$mcmc.sp[[j]],2,mean)[(np+1):(np+nl)]
+}
+boral_lambda <- mod_boral_Fungi$lv.coefs.mean[,-1]
+
+plot(boral_lambda,jSDM_lambda,
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="Loading factors lambda")
+abline(a=0,b=1,col='red')
+
+# Ws
+jSDM_lvs <- matrix(0,nsite,nl)
+for (l in 1:nl){
+  jSDM_lvs[,l] <- apply(mod_jSDM_Fungi$mcmc.latent[[paste0("lv_",l)]],2,mean)
+}
+plot(mod_boral_Fungi$lv.mean, jSDM_lvs,
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="Latent variables W")
+abline(a=0,b=1,col='red')
+
+# W.Lambda
+plot(mod_boral_Fungi$lv.mean %*% t(boral_lambda) ,
+     jSDM_lvs %*% t(jSDM_lambda),
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="W.Lambda")
+abline(a=0,b=1,col='red')
+
+# Residual correlation Matrix
+boral_R <- boral::get.residual.cor(mod_boral_Fungi, est="mean")$cor
+jSDM_R <- jSDM::get_residual_cor(mod_jSDM_Fungi)$cor.mean
+
+plot(boral_R,jSDM_R,
+     main="Residual correlation matrix R ",
+     xlab="fitted by boral", ylab="fitted by jSDM")
+abline(a=0,b=1, col='red')
+
+# Predictions 
+
+plot(boral_probit_theta_latent_Fungi,
+     mod_jSDM_Fungi$probit_theta_latent,
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="probit(theta)")
+abline(a=0,b=1,col='red')
+plot(boral_theta_latent_Fungi,
+     mod_jSDM_Fungi$theta_latent,
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="theta")
+abline(a=0,b=1,col='red')
+```
+
+
+```{r jSDM-boral-fungi-plot, echo=FALSE, out.width=800, eval=TRUE}
+knitr::include_graphics(paste0("jSDM_boral_Hmsc_files/figure-html/jSDM-boral-fungi-", 1:4, ".png"))
+```
+
+#### `jSDM` and `Hmsc`
+
+We plot the parameters estimated with `jSDM` against those estimated with `Hmsc` to compare the results obtained with both packages. 
+
+```{r jSDM-Hmsc-fungi}
+# Import center and reduce fungi data-set
+data(fungi, package="jSDM")
+Env_Fungi <- cbind(scale(fungi[,c("diam","epi","bark")]),
+                   fungi[,c("dc1","dc2","dc3","dc4",
+                            "quality3","quality4","ground3","ground4")])
+colnames(Env_Fungi) <- c("diam","epi","bark","dc1","dc2","dc3","dc4",
+                         "quality3","quality4","ground3","ground4")
+PA_Fungi <- fungi[,c("antser","antsin","astfer","fompin","hetpar","junlut",
+                     "phefer","phenig","phevit","poscae","triabi")]
+Env_Fungi <- Env_Fungi[rowSums(PA_Fungi) != 0,]
+# Remove sites where none species was recorded
+PA_Fungi<- PA_Fungi[rowSums(PA_Fungi) != 0,]
+
+print(paste(nrow(PA_Fungi),"sites and ",ncol(PA_Fungi)," species"),
+      quote = FALSE)
+nsp <- ncol(mod_jSDM_Fungi$model_spec$presence_data)
+nsite <- nrow(mod_jSDM_Fungi$model_spec$presence_data)
+nl <- mod_jSDM_Fungi$model_spec$n_latent
+np <- nrow(mod_jSDM_Fungi$model_spec$beta_start)
+
+# species fixed effect beta
+jSDM_beta <- matrix(0,nsp,np)
+for (j in 1:nsp){
+  jSDM_beta[j,] <- apply(mod_jSDM_Fungi$mcmc.sp[[j]],2,mean)[1:np]
+}
+Hmsc_beta <- t(getPostEstimate(hM=mod_Hmsc_Fungi, parName='Beta')$mean)
+par(mfrow=c(1,2))
+plot(Hmsc_beta,jSDM_beta,
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="Fixed species effect beta")
+abline(a=0,b=1,col='red')
+
+# factor loadings lambda
+jSDM_lambda <- matrix(0,nsp,nl)
+for (j in 1:nsp){
+  jSDM_lambda[j,] <- apply(mod_jSDM_Fungi$mcmc.sp[[j]],2,mean)[(np+1):(np+nl)]
+}
+Hmsc_lambda <- t(getPostEstimate(hM=mod_Hmsc_Fungi, parName='Lambda')$mean)
+
+plot(Hmsc_lambda,jSDM_lambda,
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="Loading factors lambda")
+abline(a=0,b=1,col='red')
+
+# Ws
+jSDM_lvs <- matrix(0,nsite,nl)
+for (l in 1:nl){
+  jSDM_lvs[,l] <- apply(mod_jSDM_Fungi$mcmc.latent[[paste0("lv_",l)]],2,mean)
+}
+Hmsc_lvs <- getPostEstimate(hM=mod_Hmsc_Fungi, parName='Eta')$mean
+plot(Hmsc_lvs, jSDM_lvs,
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="Latent variables W")
+abline(a=0,b=1,col='red')
+
+# W.Lambda
+plot(Hmsc_lvs %*% t(Hmsc_lambda),
+     jSDM_lvs %*% t(jSDM_lambda),
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="W.Lambda")
+abline(a=0,b=1,col='red') 
+
+# Residual correlation Matrix
+Hmsc_R <- Hmsc::computeAssociations(mod_Hmsc_Fungi)[[1]]$mean
+jSDM_R <- jSDM::get_residual_cor(mod_jSDM_Fungi)$cor.mean
+plot(Hmsc_R, jSDM_R,
+     main="Residual correlation matrix R ",
+     xlab="fitted by Hmsc", ylab="fitted by jSDM")
+abline(a=0,b=1, col='red')
+
+# Predictions 
+
+plot(Hmsc_probit_theta_latent_Fungi,
+     mod_jSDM_Fungi$probit_theta_latent,
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="probit(theta)")
+abline(a=0,b=1,col='red')
+plot(Hmsc_theta_latent_Fungi,
+     mod_jSDM_Fungi$theta_latent,
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="theta")
+abline(a=0,b=1,col='red')
+```
+
+
+```{r jSDM-Hmsc-fungi-plot, echo=FALSE, out.width=800, eval=TRUE}
+knitr::include_graphics(paste0("jSDM_boral_Hmsc_files/figure-html/jSDM-Hmsc-fungi-", 1:4, ".png"))
+```
+
+### Aravo dataset
+
+#### `jSDM` and `boral`
+
+We plot the parameters estimated with `jSDM` against those estimated with `boral` to compare the results obtained with both packages. 
+
+```{r jSDM-boral-aravo}
+# data.obs
+data(aravo, package="jSDM")
+PA_Aravo <- aravo$spe
+# Remove species with less than 5 presences
+rare_sp <- which(apply(PA_Aravo>0, 2, sum) < 5) 
+PA_Aravo <- PA_Aravo[, -rare_sp]
+print(paste(nrow(PA_Aravo),"sites and ",ncol(PA_Aravo)," species"), quote = FALSE)
+nsp <- ncol(mod_jSDM_Aravo$model_spec$count_data)
+nsite <- nrow(mod_jSDM_Aravo$model_spec$count_data)
+nl <- mod_jSDM_Aravo$model_spec$n_latent
+np <- nrow(mod_jSDM_Aravo$model_spec$beta_start)
+
+# species fixed effect beta
+jSDM_beta <- matrix(0,nsp,np)
+for (j in 1:nsp){
+  jSDM_beta[j,] <- apply(mod_jSDM_Aravo$mcmc.sp[[j]],2,mean)[1:np]
+}
+boral_beta <- cbind(mod_boral_Aravo$lv.coefs.mean[,1],mod_boral_Aravo$X.coefs.mean)
+par(mfrow=c(1,2))
+plot(boral_beta,jSDM_beta,
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="Fixed species effect beta")
+abline(a=0,b=1,col='red')
+
+# gamma parameters for interaction trait environment
+plot(c(t(mod_boral_Aravo$traits.coefs.mean[,1:2])),
+     unlist(lapply(mod_jSDM_Aravo$mcmc.gamma,colMeans)),
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="Gamma : interactions \n trait-environment")
+abline(a=0,b=1,col='red')
+# boxplot
+par(mfrow=c(2,1))
+jSDM_gamma_mcmc <- matrix(unlist(mod_jSDM_Aravo$mcmc.gamma),
+                          nrow=nrow(mod_jSDM_Aravo$mcmc.Deviance))
+colnames(jSDM_gamma_mcmc) <- gsub("_", ".", gsub("\\(Intercept\\)", "Int",
+                                  names(unlist(lapply(mod_jSDM_Aravo$mcmc.gamma,colMeans)))))
+codaObject <- boral::get.mcmcsamples(mod_boral_Aravo)
+boral_gamma_mcmc <- as.data.frame(codaObject[,grep("traits", colnames(codaObject))])[,c(4,1,5,2,6,3)]
+colnames(boral_gamma_mcmc) <- colnames(jSDM_gamma_mcmc)
+par(cex.axis=0.65)
+boxplot(jSDM_gamma_mcmc,
+        main="Interactions trait-environment gamma fitted by jSDM")
+boxplot(boral_gamma_mcmc, 
+        main="Interactions trait-environment gamma fitted by boral")
+
+# factor loadings lambda
+par(mfrow=c(1,2))
+jSDM_lambda <- matrix(0,nsp,nl)
+for (j in 1:nsp){
+  jSDM_lambda[j,] <- apply(mod_jSDM_Aravo$mcmc.sp[[j]],2,mean)[(np+1):(np+nl)]
+}
+boral_lambda <- mod_boral_Aravo$lv.coefs.mean[,-1]
+plot(boral_lambda,jSDM_lambda,
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="Loading factors lambda")
+abline(a=0,b=1,col='red')
+
+# Ws
+jSDM_lvs <- matrix(0,nsite,nl)
+for (l in 1:nl){
+  jSDM_lvs[,l] <- apply(mod_jSDM_Aravo$mcmc.latent[[paste0("lv_",l)]],2,mean)
+}
+plot(mod_boral_Aravo$lv.mean,
+     jSDM_lvs, xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="Latent variables W")
+abline(a=0,b=1,col='red')
+
+# W.Lambda
+plot(mod_boral_Aravo$lv.mean %*% t(boral_lambda) ,
+     jSDM_lvs %*% t(jSDM_lambda),
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="W.Lambda")
+abline(a=0,b=1,col='red')
+
+
+# Residual correlation Matrix
+boral_R <- boral::get.residual.cor(mod_boral_Aravo, est="mean")$cor
+jSDM_R <- jSDM::get_residual_cor(mod_jSDM_Aravo)$cor.mean
+plot(boral_R,jSDM_R,
+     main="Residual correlation matrix R ",
+     xlab="fitted by boral", ylab="fitted by jSDM")
+abline(a=0,b=1, col='red')
+
+# Predictions 
+plot(boral_log_theta_latent_Aravo, mod_jSDM_Aravo$log_theta_latent,
+     xlab="fitted by boral", 
+     ylab="fitted by jSDM",
+     main="log(theta)")
+abline(a=0,b=1,col='red')
+plot(boral_theta_latent_Aravo,
+     mod_jSDM_Aravo$theta_latent,
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="theta")
+abline(a=0,b=1,col='red')
+```
+
+```{r jSDM-boral-aravo-plot, echo=FALSE, out.width=800, eval=TRUE}
+knitr::include_graphics(paste0("jSDM_boral_Hmsc_files/figure-html/jSDM-boral-aravo-", 1:5, ".png"))
+```
+
+#### `jSDM` and `Hmsc`
+
+We plot the parameters estimated with `jSDM` against those estimated with `Hmsc` to compare the results obtained with both packages. 
+
+```{r jSDM-Hmsc-aravo}
+nsp <- ncol(mod_jSDM_Aravo$model_spec$beta_start)
+nsite <- nrow(mod_jSDM_Aravo$model_spec$W_start)
+print(paste(nsite,"sites and ",nsp," species"),quote = FALSE)
+nl <- mod_jSDM_Aravo$model_spec$n_latent
+np <- nrow(mod_jSDM_Aravo$model_spec$beta_start)
+
+# species fixed effect beta
+jSDM_beta <- matrix(0,nsp,np)
+for (j in 1:nsp){
+  jSDM_beta[j,] <- apply(mod_jSDM_Aravo$mcmc.sp[[j]],2,mean)[1:np]
+}
+Hmsc_beta <- t(getPostEstimate(hM=mod_Hmsc_Aravo, parName='Beta')$mean)
+par(mfrow=c(1,2))
+plot(Hmsc_beta,jSDM_beta,
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="Fixed species effect beta")
+abline(a=0,b=1,col='red')
+
+# gamma parameters for interaction trait environment
+Hmsc_gamma <- t(getPostEstimate(hM=mod_Hmsc_Aravo, parName='Gamma')$mean)
+plot(c(Hmsc_gamma),
+     unlist(lapply(mod_jSDM_Aravo$mcmc.gamma,colMeans)),
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="Gamma : interactions \n trait-environment")
+abline(a=0,b=1,col='red')
+# boxplot
+par(mfrow=c(2,1))
+jSDM_gamma_mcmc <- matrix(unlist(mod_jSDM_Aravo$mcmc.gamma),
+                          nrow=nrow(mod_jSDM_Aravo$mcmc.Deviance))
+colnames(jSDM_gamma_mcmc) <- gsub("_", ".", gsub("\\(Intercept\\)", "Int",
+                                  names(unlist(lapply(mod_jSDM_Aravo$mcmc.gamma,colMeans)))))
+codaObject <- Hmsc::convertToCodaObject(mod_Hmsc_Aravo, start=1)
+Hmsc_gamma_mcmc <- as.data.frame(codaObject$Gamma[[1]])[,c(1,4,2,5,3,6)]
+colnames(Hmsc_gamma_mcmc) <- colnames(jSDM_gamma_mcmc)
+par(cex.axis=0.65)
+boxplot(jSDM_gamma_mcmc,
+        main="Interactions trait-environment \n gamma fitted by jSDM")
+boxplot(Hmsc_gamma_mcmc, 
+        main="Interactions trait-environment \n gamma fitted by Hmsc")
+
+# factor loadings lambda
+par(mfrow=c(1,2))
+jSDM_lambda <- matrix(0,nsp,nl)
+for (j in 1:nsp){
+  jSDM_lambda[j,] <- apply(mod_jSDM_Aravo$mcmc.sp[[j]],2,mean)[(np+1):(np+nl)]
+}
+Hmsc_lambda <- t(getPostEstimate(hM=mod_Hmsc_Aravo, parName='Lambda')$mean)
+
+plot(Hmsc_lambda,jSDM_lambda,
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="Loading factors lambda")
+abline(a=0,b=1,col='red')
+
+# Ws
+jSDM_lvs <- matrix(0,nsite,nl)
+for (l in 1:nl){
+  jSDM_lvs[,l] <- apply(mod_jSDM_Aravo$mcmc.latent[[paste0("lv_",l)]],2,mean)
+}
+Hmsc_lvs <- getPostEstimate(hM=mod_Hmsc_Aravo, parName='Eta')$mean
+plot(Hmsc_lvs, jSDM_lvs,
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="Latent variables W")
+abline(a=0,b=1,col='red')
+
+# W.Lambda
+plot(Hmsc_lvs %*% t(Hmsc_lambda),
+     jSDM_lvs %*% t(jSDM_lambda),
+     xlab="fitted by Hmsc",
+     ylab="fitted by jSDM",
+     main="W.Lambda")
+abline(a=0,b=1,col='red') 
+
+# Residual correlation Matrix
+Hmsc_R <- Hmsc::computeAssociations(mod_Hmsc_Aravo)[[1]]$mean
+jSDM_R <- jSDM::get_residual_cor(mod_jSDM_Aravo)$cor.mean
+
+plot(Hmsc_R,jSDM_R,
+     main="Residual correlation matrix R ",
+     xlab="fitted by Hmsc", ylab="fitted by jSDM")
+abline(a=0,b=1, col='red')
+
+# Predictions 
+
+plot(c(Hmsc_log_theta_latent_Aravo),
+     mod_jSDM_Aravo$log_theta_latent,
+     xlab="fitted by Hmsc", ylab="fitted by jSDM",
+     main="log(theta)")
+abline(a=0,b=1,col='red')
+plot(Hmsc_theta_latent_Aravo,
+     mod_jSDM_Aravo$theta_latent,
+     xlab="fitted by Hmsc", ylab="fitted by jSDM",
+     main="theta")
+abline(a=0,b=1,col='red')
+```
+
+
+```{r jSDM-Hmsc-aravo-plot, echo=FALSE, out.width=800, eval=TRUE}
+knitr::include_graphics(paste0("jSDM_boral_Hmsc_files/figure-html/jSDM-Hmsc-aravo-", 1:5, ".png"))
+```
+
+### Mites dataset
+
+#### `jSDM` and `boral`
+
+We plot the parameters estimated with `jSDM` against those estimated with `boral` to compare the results obtained with both packages. 
+
+
+```{r jSDM-boral-mites}
+# Remove species with less than 10 presences
+rare_sp <- which(apply(PA_Mites>0, 2, sum) < 10)
+if(length(rare_sp)!=0) PA_Mites <- PA_Mites[, -rare_sp]
+print(paste(nrow(PA_Mites),"sites and ",ncol(PA_Mites)," species"),quote = FALSE)
+nsp <- ncol(mod_jSDM_Mites$model_spec$count_data)
+nsite <- nrow(mod_jSDM_Mites$model_spec$count_data)
+nl <- mod_jSDM_Mites$model_spec$n_latent
+np <- nrow(mod_jSDM_Mites$model_spec$beta_start)
+
+# species fixed effect beta
+jSDM_beta <- matrix(0,nsp,np)
+for (j in 1:nsp){
+  jSDM_beta[j,] <- apply(mod_jSDM_Mites$mcmc.sp[[j]],2,mean)[1:np]
+}
+boral_beta <- cbind(mod_boral_Mites$lv.coefs.mean[,"beta0"],mod_boral_Mites$X.coefs.mean)
+
+par(mfrow=c(1,2))
+plot(boral_beta,jSDM_beta,
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="Fixed species effect beta")
+abline(a=0,b=1,col='red')
+
+# factor loadings lambda
+jSDM_lambda <- matrix(0,nsp,nl)
+for (j in 1:nsp){
+  jSDM_lambda[j,] <- apply(mod_jSDM_Mites$mcmc.sp[[j]],2,mean)[(np+1):(np+nl)]
+}
+boral_lambda <- mod_boral_Mites$lv.coefs.mean[,-1]
+
+plot(boral_lambda,jSDM_lambda,
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="Loading factors lambda")
+abline(a=0,b=1,col='red')
+
+# Ws
+jSDM_lvs <- matrix(0,nsite,nl)
+for (l in 1:nl){
+  jSDM_lvs[,l] <- apply(mod_jSDM_Mites$mcmc.latent[[paste0("lv_",l)]],2,mean)
+}
+plot(mod_boral_Mites$lv.mean, jSDM_lvs,
+     xlab="fitted by boral", 
+     ylab="fitted by jSDM",
+     main="Latent variables W")
+abline(a=0,b=1,col='red')
+
+# W.Lambda
+plot(mod_boral_Mites$lv.mean %*% t(boral_lambda) ,
+     jSDM_lvs %*% t(jSDM_lambda),
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="W.Lambda")
+abline(a=0,b=1,col='red')
+
+# Residual correlation Matrix
+boral_R <- boral::get.residual.cor(mod_boral_Mites, est="mean")$cor
+jSDM_R <- jSDM::get_residual_cor(mod_jSDM_Mites)$cor.mean
+
+plot(boral_R,jSDM_R,
+     main="Residual correlation matrix R ",
+     xlab="fitted by boral", ylab="fitted by jSDM")
+abline(a=0,b=1, col='red')
+
+# Predictions 
+
+plot(boral_log_theta_latent_Mites,
+     mod_jSDM_Mites$log_theta_latent,
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="log(theta)")
+abline(a=0,b=1,col='red')
+plot(boral_theta_latent_Mites,
+     mod_jSDM_Mites$theta_latent,
+     xlab="fitted by boral",
+     ylab="fitted by jSDM",
+     main="theta")
+abline(a=0,b=1,col='red')
+```
+
+```{r jSDM-boral-mites-plot, echo=FALSE, out.width=800, eval=TRUE}
+knitr::include_graphics(paste0("jSDM_boral_Hmsc_files/figure-html/jSDM-boral-mites-", 1:4, ".png"))
+```
+
+#### `jSDM` and `Hmsc`
+
+We plot the parameters estimated with `jSDM` against those estimated with `Hmsc` to compare the results obtained with both packages. 
+
+```{r jSDM-Hmsc-mites}
+# Remove species with less than 10 presences
+rare_sp <- which(apply(PA_Mites>0, 2, sum) < 10)
+if(length(rare_sp)!=0) PA_Mites <- PA_Mites[, -rare_sp]
+print(paste(nrow(PA_Mites),"sites and ",ncol(PA_Mites)," species"),quote = FALSE)
+nsp <- ncol(mod_jSDM_Mites$model_spec$count_data)
+nsite <- nrow(mod_jSDM_Mites$model_spec$count_data)
+nl <- mod_jSDM_Mites$model_spec$n_latent
+np <- nrow(mod_jSDM_Mites$model_spec$beta_start)
+
+# species fixed effect beta
+jSDM_beta <- matrix(0,nsp,np)
+for (j in 1:nsp){
+  jSDM_beta[j,] <- apply(mod_jSDM_Mites$mcmc.sp[[j]],2,mean)[1:np]
+}
+Hmsc_beta <- t(getPostEstimate(hM=mod_Hmsc_Mites, parName='Beta')$mean)
+par(mfrow=c(1,2))
+plot(Hmsc_beta,jSDM_beta,
+     xlab="fitted by Hmsc", ylab="fitted by jSDM",
+     main="Fixed species effect beta")
+abline(a=0,b=1,col='red')
+
+# factor loadings lambda
+jSDM_lambda <- matrix(0,nsp,nl)
+for (j in 1:nsp){
+  jSDM_lambda[j,] <- apply(mod_jSDM_Mites$mcmc.sp[[j]],2,mean)[(np+1):(np+nl)]
+}
+Hmsc_lambda <- t(getPostEstimate(hM=mod_Hmsc_Mites, parName='Lambda')$mean)
+
+plot(Hmsc_lambda,jSDM_lambda,
+     xlab="fitted by Hmsc", ylab="fitted by jSDM",
+     main="Loading factors lambda")
+abline(a=0,b=1,col='red')
+
+# Ws
+jSDM_lvs <- matrix(0,nsite,nl)
+for (l in 1:nl){
+  jSDM_lvs[,l] <- apply(mod_jSDM_Mites$mcmc.latent[[paste0("lv_",l)]],2,mean)
+}
+Hmsc_lvs <- getPostEstimate(hM=mod_Hmsc_Mites, parName='Eta')$mean
+plot(Hmsc_lvs, jSDM_lvs,
+     xlab="fitted by Hmsc", ylab="fitted by jSDM",
+     main="Latent variables W")
+abline(a=0,b=1,col='red')
+
+# W.Lambda
+plot(Hmsc_lvs %*% t(Hmsc_lambda),
+     jSDM_lvs %*% t(jSDM_lambda),
+     xlab="fitted by Hmsc", ylab="fitted by jSDM",
+     main="W.Lambda")
+abline(a=0,b=1,col='red') 
+
+# Residual correlation Matrix
+Hmsc_R <- Hmsc::computeAssociations(mod_Hmsc_Mites)[[1]]$mean
+jSDM_R <- jSDM::get_residual_cor(mod_jSDM_Mites)$cor.mean
+
+plot(Hmsc_R,jSDM_R,
+     main="Residual correlation matrix R ",
+     xlab="fitted by Hmsc", ylab="fitted by jSDM")
+abline(a=0,b=1, col='red')
+
+# Predictions 
+
+plot(Hmsc_log_theta_latent_Mites,
+     mod_jSDM_Mites$log_theta_latent,
+     xlab="fitted by Hmsc", ylab="fitted by jSDM",
+     main="log(theta)")
+abline(a=0,b=1,col='red')
+plot(Hmsc_theta_latent_Mites,
+     mod_jSDM_Mites$theta_latent,
+     xlab="fitted by Hmsc", ylab="fitted by jSDM",
+     main="theta")
+abline(a=0,b=1,col='red')
+```
+
+
+```{r jSDM-Hmsc-mites-plot, echo=FALSE, out.width=800, eval=TRUE}
+knitr::include_graphics(paste0("jSDM_boral_Hmsc_files/figure-html/jSDM-Hmsc-mites-", 1:4, ".png"))
+```
+
+On the figures above, the parameters estimated with `jSDM` are close to those obtained with `boral` or `Hmsc` if the points are near the red line representing the identity function ($y=x$). 
+
