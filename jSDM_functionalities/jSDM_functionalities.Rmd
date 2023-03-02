@@ -178,7 +178,19 @@ The data needed to fit JSDMs are the realizations of a response variable, $Y=(y_
 
 These data can be provided in a wide format as above, or in a long format that allows to handle missing data, in the package `jSDM`.  
 
-- Figure : Ovaskainen fourth corner without Phylogenie 
+- Response variable: $Y=(y_{n})^{n=1,\ldots,nobs}$ such as $species_n=j$ and $site_n=i$ with:
+
+- Explanatory variables: bioclimatic data about each site. $X=(X_i)_{i=1,\ldots,n}$ with $X_i=(1,x_i^1,\ldots,x_i^p)\in \mathbb{R}^{(p+1)}$ where $p$ is the number of bioclimatic variables considered. explanatory variables found in matrix $D=(D_n)_{i=1,\ldots,nobs}$.
+
+
+
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.4\textwidth]{figures/dataset}
+\label{fig:dataset}
+\caption{$Y$: occurrences of species recorded in a set of spatial sampling units, $X$: environmental covariates measured over the sampling units and $T$: traits measured for the species in the $Y$ matrix.}
+\end{figure}
 
 ### Model definition 
 
@@ -231,6 +243,21 @@ Default values of hyper parameters, for each  *a priori* distribution, are speci
 \includegraphics[height=0.4\textheight]{figures/DAG-jSDM-rand.png}
 \end{figure}
 
+
+$$ \mathrm{probit}(\theta_{n}) =\alpha_i + D_n.\gamma + X_n.\beta_j +  W_i.\lambda_j,$$
+such as $species_n=j$ and $site_n=i$.
+
+- Latent variable $z_{n} = \alpha_i + D_n.\gamma + X_n.\beta_j + W_i.\lambda_j + \epsilon_{n}$, with $\forall (n) \ \epsilon_{n} \sim \mathcal{N}(0,1)$ and such that:
+
+$$y_{n}=\begin{cases}
+1 & \text{if} \ z_{n} > 0 \\
+0 &  \text{otherwise.}
+\end{cases}$$
+
+It can be easily shown that: $y_{n} \sim \mathcal{B}ernoulli(\theta_{n})$. 
+
+- $\gamma$ correspond to the regression coefficients of explanatory variables found in matrix $D=(D_n)_{i=1,\ldots,nobs}$. We use a prior distribution $\mathcal{N}(0,10)$ for all parameters $\gamma$. 
+
 ## Bayesian inference methods
 
 The Bayesian inference methods used by the package to estimate the parameters of the JSDMs are summarized in this section. For more information, you will find a detailed presentation with demonstrations in the vignette \href{https://ecology.ghislainv.fr/jSDM/articles/proof.html}{Bayesian inference methods}. 
@@ -258,6 +285,200 @@ In the same way as for the probit model, we can define the models with logit or 
 functions)
 
 # Applications
+
+
+## Fitting JSDM including species traits 
+
+Analyzing response of alpine plants [@Choler2005] to snowmelt Date according to their SLA 
+
+# Fitting JSDM from long format dataset with missing data 
+
+## Inference of biodiversity maps in Madagascar from large forest inventories
+
+### Datasets 
+
+#### Forest inventory
+
+National forest inventories carried out on $753$ sites on the island of Madagascar are available, listing the presence or absence of $555$ plant species on each of these sites between 1994 and 1996.
+We use these forest inventories to calculate a matrix indicating the presence by a $1$ and the absence by a $0$ of the species at each site by removing observations for which the species is not identified. This matrix therefore records the occurrences of $483$ ($n_{sp}$) species at $751$ ($n_{site}$) sites.
+
+#### Current environmental variables
+
+Among the climatic and environmental data available on the site \url{https://madaclim.cirad.fr}, concerning the whole island of Madagascar at present (interpolations of representative observed data from the years 1960-1990), and with a resolution of 1km, we chose to use the following variables, because they have an ecological meaning which makes them easily interpretable and are little correlated between them, according to the article @Vieilledent2013 : 
+
+```{r clim-variables, echo=FALSE}
+results <- data.frame(variable=c("temp","prec","sais.temp","sais.prec","cwd"), description=c("the average annual temperature ($^\\circ C\\times 10$)", "the average annual precipitation (mm).", "the seasonality of temperatures corresponds to the standard deviation of monthly temperatures multiplied by 100.", "the seasonality of precipitation as a coefficient of variation.", "the annual climatic water deficit (mm) is based on monthly precipitation ($prec$) and potential evapotranspiration ($pet$) which is defined as the amount of evaporation that would occur in a month if a sufficient water source were available: $\\mathrm{cwd}=\\sum_{m=1}^{12}\\min(0,\\mathrm{prec}_m-\\mathrm{pet}_m)$.")) 
+
+knitr::kable(results, "latex", row.names=F, booktabs=TRUE, align = 'l', escape=FALSE, caption="Climatic variables") %>%
+  column_spec(1, bold=TRUE) %>%
+  column_spec(2, width="8cm") %>%
+  kableExtra::kable_styling(latex_options=c("HOLD_position","striped"), full_width=FALSE)
+```
+
+We consider also the quadratic effects of these climate variables to perform a quadratic regression, which is more suitable for fitting a niche model than a linear regression. The values of these climate variables, on the coordinates of the inventory plots, are extracted, scaled and centered. The resulting data-set is used as explanatory variables for fitting the JSDM. 
+
+### Fitting joint species distribution model (JSDM) 
+
+#### Model definition
+
+We use the latent variable model (LVM) defined previously to account for species co-occurrence on all sites :
+
+$$ \mathrm{probit}(\theta_{ij}) =\alpha_i + \beta_{0j}+X_i.\beta_j+ W_i.\lambda_j $$
+
+It can be easily shown that the response variable $y_{ij} \sim \mathcal{B}ernoulli(\theta_{ij})$ by defining the latent variable :  
+$z_{ij} = \alpha_i + \beta_{0j} + X_i.\beta_j + W_i.\lambda_j + \epsilon_{i,j}$, with $\forall (i,j) \ \epsilon_{ij} \sim \mathcal{N}(0,1)$, such that:
+
+$$y_{ij}=\begin{cases}
+1 & \text{if} \ z_{ij} > 0 \\
+0 &  \text{otherwise.}
+\end{cases}$$
+
+- Latent variables: $W_i=(W_i^1,\ldots,W_i^q)$ where $q$ is the number of latent variables considered, which has to be fixed by the user (in this case $q=2$).
+We assume that $W_i \sim \mathcal{N}(0,I_q)$ and we define the associated coefficients  $\lambda_j=(\lambda_j^1,\ldots, \lambda_j^q)'$, also known as "factor loadings" [@Warton2015]. We use a prior distribution $\mathcal{N}(0,1)$ for all lambda not concerned by constraints to $0$ on upper diagonal and to strictly positive values on diagonal. 
+
+- Explanatory variables: bioclimatic data about each site and their quadratic effects. $X=(X_i)_{i=1,\ldots,n_{site}}$ with $X_i=(\mathrm{temp}_i, \mathrm{prec}_i, \mathrm{sais.temp}_i, \mathrm{sais.prec}_i, \mathrm{cwd}_i, \mathrm{temp}_i^2, \mathrm{prec}_i^2, \mathrm{sais.temp}_i^2, \mathrm{sais.prec}_i^2, \mathrm{cwd}_i^2)\in \mathbb{R}^p$ where $p=10$ is the number of variables considered.
+The corresponding regression coefficients for each species $j$ are noted : $\beta_j=(\beta_j^1,\ldots,\beta_j^p)'$. We use a prior distribution $\mathcal{N}(0,1)$ for all beta.  
+
+- $\beta_{0j}$ corresponds to the intercept for species $j$ which is assumed to be a fixed effect. We use a prior distribution $\mathcal{N}(0,10)$ and define the prevalence of species $j$ ($p_j=\sum\limits_{i=1}^{n_{site}}\frac{y_{ij}}{n_{site}}$) as starting values for the species intercept to improve the estimation of this parameter.
+
+- $\alpha_i$ represents the random effect of site $i$ such as $\alpha_i \sim \mathcal{N}(0,V_{\alpha})$ and we assume that $V_{\alpha} \sim \mathcal {IG}(\text{shape}=0.1, \text{rate}=0.1)$ as prior distribution by default. 
+
+#### Parameters inference
+
+We fit a binomial joint species distribution model, including two latent variables and a random site effect using the `jSDM_binomial_probit()` function to perform binomial probit regression considering all the species from the data described above, by performing $80 000$ iterations including $40 000$ of burn-in and we retain $N_{samp}=1 000$ values for each parameter of the model.
+
+```{r fit-JSDM-Mada-table, echo=FALSE, include=TRUE}
+load("~/Documents/projet_BioSceneMada/Report/Internship_Report/data/mada_mod.RData")
+nsp<-ncol(mod_all$model_spec$presence_data)
+nplot<-nrow(mod_all$model_spec$presence_data)
+p <- nrow(mod_all$model_spec$beta_start)
+n_latent <- mod_all$model_spec$n_latent
+T_all <- as.numeric(T_all,units="hours")
+results <- data.frame(nsp,nplot,n_obs=nsp*nplot, 
+                      n_param=(p+n_latent)*nsp-1 + nplot*(n_latent+1) + 1,
+                      ngibbs="80000","Time"= T_all, dev=mean(mod_all$mcmc.Deviance))
+colnames(results)<- c("Number of species", "Number of sites", "Number of observations","Number of estimated parameters", "Iterations performed","Computation time (hours)","Deviance")
+knitr::kable(results, "latex", row.names=F, digits=1, booktabs=TRUE, align = 'c',
+             caption="Compuation time for fitting JSDM from Madagascar data-sets and deviance obtained") %>%
+    column_spec(1:9, width="1.9cm") %>%
+		kableExtra::kable_styling(latex_options=c("HOLD_position","striped"), full_width=FALSE)
+```
+
+<!-- ```{r fit-JSDM-Mada-table, echo=FALSE, include=TRUE} -->
+<!-- load("~/Documents/projet_BioSceneMada/Report/data/mada_mod.RData") -->
+<!-- nsp <- ncol(mod_all$model_spec$presence_data) -->
+<!-- nplot <- nrow(mod_all$model_spec$presence_data) -->
+<!-- p <- nrow(mod_all$model_spec$beta_start) -->
+<!-- n_latent <- mod_all$model_spec$n_latent -->
+<!-- T_all <- as.numeric(T_all,units="mins") -->
+<!-- # Accuracy  -->
+<!-- # Compute the proportion of species predicted as present  -->
+<!-- # among the species  observed at each site for the different data-sets. -->
+<!-- Sensitivity <- function(PA, theta){ -->
+<!--   n_sites <- nrow(PA) -->
+<!--   score <- 0 -->
+<!--   for(i in 1:n_sites){ -->
+<!--     # Sensitivity  -->
+<!--     obs_sp <- which(PA[i,]>0) -->
+<!--     nobs_sp <- length(obs_sp) -->
+<!--     pred_sp <- which(theta[i,] >= sort(theta[i,], decreasing = TRUE)[nobs_sp]) -->
+<!--     score <- score + sum(pred_sp %in% obs_sp)/ifelse(nobs_sp!=0, nobs_sp,1) -->
+<!--   } -->
+<!--   return(score/n_sites) -->
+<!-- } -->
+<!-- sensitivity <- Sensitivity(mod_all$model_spec$presence_data, mod_all$theta_latent) -->
+<!-- Specificity  <- function(PA, theta){ -->
+<!--   n_sites <- nrow(PA) -->
+<!--   score <- 0 -->
+<!--   for(i in 1:n_sites){ -->
+<!--     # Specificity  -->
+<!--     abs_sp <- which(PA[i,]==0) -->
+<!--     nabs_sp <- length(abs_sp) -->
+<!--     pred_abs_sp <- which(theta[i,] <= sort(theta[i,])[nabs_sp]) -->
+<!--     score <- score + sum(pred_abs_sp %in% abs_sp)/ifelse(nabs_sp!=0, nabs_sp, 1) -->
+<!--   } -->
+<!--   return(score/n_sites) -->
+<!-- } -->
+<!-- specificity <- Specificity(mod_all$model_spec$presence_data, mod_all$theta_latent) -->
+<!-- results <- data.frame(nsp,nplot,n_obs=nsp*nplot, n.col.X=p, n.latent=n_latent, -->
+<!--                       n_param=(p+n_latent)*nsp-1 + nplot*(n_latent+1) + 1, -->
+<!--                       ngibbs="80000", dev=round(mean(mod_all$mcmc.Deviance)), TSS=sensitivity+specificity-1, "Time"= round(T_all)) -->
+<!-- colnames(results)<- c("n.species", "n.sites", "n.obs", "n.col.X", "n.latent", "n.param", "n.mcmc", "Deviance", "TSS", "Computation time (min)") -->
+<!-- knitr::kable(results, "latex", row.names=F, digits=1, booktabs=TRUE, align = 'c') %>% -->
+<!--     row_spec(0, bold=TRUE) %>% -->
+<!--     column_spec(10, width="2cm") %>% -->
+<!-- 		kableExtra::kable_styling(latex_options=c("HOLD_position","striped","scale_down"), full_width=FALSE) %>% -->
+<!--     kableExtra::save_kable(file="figures/JSDM_Mada_poster.pdf", density=600) -->
+<!-- ``` -->
+
+#### Evaluation of MCMC convergence 
+
+multiple chains Rhat  ?
+
+### Predictive performance of the model  
+
+compute AUC, Rprecision on inventory sites to assess the predictive performance of the model ?
+
+### Estimated species-species associations
+
+After fitting the JSDM with latent variables, the **full species residual correlation matrix** $R=(R_{ij})^{i=1,\ldots, n_{site}}_{j=1,\ldots, n_{species}}$ can be derived from the covariance in the latent variables such as : 
+ $$\Sigma_{ij} = \lambda_i^T .\lambda_j$$, then we compute correlations from covariances :
+  $$R_{i,j} = \frac{\Sigma_{ij}}{\sqrt{\Sigma _{ii}\Sigma _{jj}}}$$.
+  
+figure: residual correlation matrix of 50 more abundant species 
+
+<!-- # ```{r plot-associations, echo=FALSE, fig.show = "hold",fig.pos = "H", fig.align='center', out.width="40%", eval=TRUE, fig.cap="Representation of the top 100 estimated residual correlations between species, based on their number of observed occurrences and environmental preferences.", fig.subcap=c("The top 100 residual correlations between species, with the 483 species sorted according to the number of sites where they occur out of the 751 inventoried.","The top 100 residual correlations between species, with the species sorted according to their largest environmental coefficients ($\\beta$) (the outer ring shows the distribution of environmental effect for species within the sample.)")} -->
+<!-- # knitr::include_graphics("Application/Madagascar_files/figure-html/plot-associations-1.png") -->
+<!-- # knitr::include_graphics("Application/Madagascar_files/figure-html/plot-associations-2.png") -->
+<!-- # ``` -->
+<!-- # The figure \@ref(fig:plot-associations), inspired by the article @Pichler2021, allows us to observe the positive or negative residual correlations between species which can be interpreted in terms of positive or negative influence of the presence of a species on the probability of occurrence of another. -->
+<!-- # - main correlation more between abundant species -->
+<!-- # - correlation between species whith main env effect cwd and sais_prec -->
+
+### Interpolation of parameters between inventory sites 
+
+The presence of a spatial structure where observations close to each other are more similar than those far away (spatial auto-correlation) is a prerequisite for the application of geostatistics and according to the spatial representations in supplementary, it seems to be satisfied.  
+
+Thus, we can to interpolate sites' parameters ($\alpha$ and $W$) for the whole island from those estimated for the inventory plots, using the spatial interpolation method called regularized spline with tension (**RST**) from [`GRASS GIS`](https://grass.osgeo.org/) software via `rgrass7` R package. This method is described in the article [@Mitasova1993]. We then calculate species occurrence probabilities between inventory sites using interpolated site parameters. 
+
+### Estimated species richness 
+
+Species richness, also known as $\alpha$-diversity, reflects the number of species coexisting in a given environment and is calculated by summing the number of species present at each site.  
+
+(ref:cap-sprich) Representation of species richness at inventory sites.
+
+(ref:sprich-ref) @Scherrer2020
+
+```{r species-richness-representation, echo=FALSE, fig.show = "hold",fig.pos = "H", out.width = "50%", fig.align = "center", fig.ncol = 2, eval=TRUE, fig.subcap=c('Spatial representation of the species richness observed at each inventory site $i$ defined by $R_i=\\sum\\limits_ {j=1}^{n_{sp}} y_{ij}$.', 'Spatial representation of the species richness estimated, following (ref:sprich-ref), by summing the estimated occurrence probabilities of all species on each inventory site: $\\widehat{R}_i=\\sum\\limits_{j=1}^{n_{sp}} \\widehat{\\theta}_{ij}$.', 'Estimated species richness according to the observed one.'), fig.cap="(ref:cap-sprich)"}
+knitr::include_graphics(c("Application/Madagascar_files/figure-html/species-richness-representation-2.png","Application/Madagascar_files/figure-html/species-richness-representation-1.png"))
+knitr::include_graphics("Application/Madagascar_files/figure-html/species-richness-representation-3.png")
+```
+
+We can see on figures \@ref(fig:species-richness-representation).a and \@ref(fig:species-richness-representation).b that the observed species richness is greater in the moist forest of the north-east of the island, particularly in the Masoala peninsula. Moreover, it can be seen on figure \@ref(fig:species-richness-representation).c that the observed species richness on the inventory sites corresponds fairly well to that estimated.
+
+
+(ref:cap-sprich-deforest) Estimated species richness at the Madagascar scale by summing interpolated occurrence probabilities (left) and estimated species richness in Madagascar restricted to remaining forest cover in 2000 from the article @Vieilledent2018, to account for deforestation on the island (right). 
+
+```{r plot-species-richness-deforest, echo=FALSE, eval=TRUE, fig.show = "hold", fig.pos = "H", out.height = "30%", fig.align = "center", fig.cap="(ref:cap-sprich-deforest)"}
+knitr::include_graphics("Application/Madagascar_files/figure-html/plot-species-richness-deforest-2.png")
+```
+
+We can see on figure \@ref(fig:plot-species-richness-deforest) that the species richness, computed from interpolated occurrence probabilities, is greater in the moist forest of the north-east of the island, particularly in the Masoala peninsula as expected given the observed species richness on inventory sites. It can be explained by the fact that this area is located close to the Equator and is receiving the highest level of precipitation in Madagascar. As a consequence, this area benefits from high levels of resources (light and water) and is characterized by a low environmental stress and a long growing season [@Vieilledent2013]. Note that the estimated species richness does not necessarily stand for a 'true' number of present species but represent a relative species richness between sites (one site is richer in species than another site).
+
+### Estimated species turnover at Madagascar scale
+
+Species turnover, also known as $\beta$-diversity, is a measure of biodiversity that compares the diversity of species between ecosystems or along environmental gradients, using the number of taxa that are unique to each ecosystem.  
+
+(ref:cap-forest-type) Forest types in Madagascar from the article @Vieilledent2018.
+
+(ref:cap-div-beta) Estimated species turnover at the Madagascar scale (left) and estimated species turnover in Madagascar restricted to remaining forest cover in 2000 from the article @Vieilledent2018, to account for deforestation on the island (right). To obtain these maps, we perform a standard PCA on the species occurrence probabilities, interpolated for each pixel, referring to the article @Allnutt2008. The coordinates obtained for the first three PCA's axes, that reflect the composition of the species community likely to occupy the corresponding pixel, are scaled [0,255] to be represented by red, green and blue color levels. The combination of these three color levels determines the coloring of each pixel in the displayed $\beta$-diversity map. Therefore, a color difference between two pixels indicates that the species present are not the same, while pixels of identical color host communities of similar species.
+
+```{r diversity-beta, echo=FALSE, fig.show = "hold", fig.pos = "H", out.height=c("30%","27%"), fig.col=1, fig.align = "center",  eval=TRUE, fig.cap="Estimated species turnover and forest types in Madagascar.", fig.subcap=c("(ref:cap-div-beta)","(ref:cap-forest-type)")}
+knitr::include_graphics("Application/Madagascar_files/figure-html/plot-diversity-beta-1.png") 
+knitr::include_graphics("Application/Madagascar_files/figure-html/mada_forest_type.jpg")
+```
+
+We can see that the estimated map of $\beta$-diversity on the figure \@ref(fig:diversity-beta).a agrees with the map of Madagascar’s forest types from the article @Vieilledent2018 on figure  \@ref(fig:diversity-beta).b. Indeed, communities of species represented by shades of blue and green correspond to the eastern moist forest, communities represented by shades of red match the western dry forest and communities in magenta correspond to the southern spiny forest. Moreover, the $\beta$-diversity map we obtain allows to identify substantially different species communities within these three forest types. For example, we can clearly identify three different tree communities (in blue, green, and black) within the eastern moist forest.
 
 ## Benchmarking our method against state-of-the-art JSDM implementation
 
@@ -345,6 +566,7 @@ result[8, 2:8] <- result[3, 2:8] * result[4, 2:8]
 # n.param=n.sites*n.latent + n.species*(n.col.X + n.latent) -1 (constrained Lambda: lower triangular)
 result[9, 2:8] <- result[3, 2:8]*(result[5, 2:8]) + result[4, 2:8]*(result[6, 2:8] + result[5, 2:8]) - 1
 result[10, 2:8] <- 20000
+
 # All interactions traits environment are considered and intercept included:
 # n.param <- n.param + n.col.X*(n.traits + 1) 
 result[9, "Aravo"] <- result[9, "Aravo"] + result[6, "Aravo"]*(result[7, "Aravo"] + 1)
@@ -408,7 +630,7 @@ kable(result, booktabs=TRUE, "latex", align=c('l', rep('r',7)), escape=FALSE) %>
 \caption{Dimensions of the data-sets used (n.sites and n.species), number of observations (n.obs=n.site $\\times$ n.species), number of covariates, species traits and latent axes considered (n.col.X, n.traits and n.latent), number of parameters to estimate (n.param) by performing n.mcmc iterations, computation time in seconds required to fit the model from each of the data-sets and deviance computed from the parameters estimated with each of the packages as follows: $D=-2\sum\limits_{i=1}^I\sum\limits_{j=1}^J\log(\mathbb {P}(y_{ij}|\beta_j,\lambda_j, W_i))$. Root-Mean-Square Error (RMSE) is computed for the probabilities of presences $\theta_{ij}$ on the simulated data-set. Sensitivity, specificity and true skills statistic ($TSS= sensitivity + specificity -1$) were computed for each data-set, considering the predicted presence-absences matrix : $\hat{Y}$ such as $\hat{y}_{ij}=1$ if the corresponding estimated occurrence probability $\hat{\theta}_{ij} \geq \tau_i$ and $\hat{y}_{ij}=0$ otherwise, where $\tau_i=\min\limits_{ j , \ y_{ij}=1}(\hat{\theta}_{ij})$, represents the presence threshold for the site $i$, defined by the lowest estimated probability value for an occurrence point.} 
 \label{tab:comparison-time-accuracy}
 
-```{r comparison-time-accuracy, echo=FALSE, include=TRUE, fig.show = "hold",fig.pos = "H", fig.align='center'}
+```{r comparison-time-accuracy, echo=FALSE, include=TRUE, out.width="200%", fig.dim=c(10,10), fig.align='center', eval=TRUE}
 knitr::include_graphics("figures/comparison.pdf")
 ```
 \end{table}
@@ -418,21 +640,29 @@ knitr::include_graphics("figures/comparison.pdf")
 ```{r comparison-sampler-efficiency-table, echo=FALSE, include=FALSE, eval=TRUE}
 
 load(file="Application/jSDM_boral_Hmsc_files/jSDM-boral-Hmsc-neff.rda")
+nobs <- result[8, 2:8]
+nparam <- result[9, 2:8]
 ## Number of effective sampling values by second for each package
-result <- as.data.frame(matrix(NA,23,8))
+result <- as.data.frame(matrix(NA,25,8))
 colnames(result) <- c(" ","Simulated", "Mosquitos", "Eucalypts", "Frogs", "Fungi", "Aravo", "Mites")
-result[, 1] <- c("n.burnin", "n.sample", "n.thin", "sample.size",  rep(c("boral","Hmsc","jSDM"), 6), "")
-result[1,2:8] <- 10000
-result[2,2:8] <- 10000
-result[3,2:8] <- 10
-result[4,2:8] <- 1000
-result[5,2:8] <- round(c(T_boral_sim, T_boral_Mosquitos, T_boral_Eucalypts, T_boral_Frogs, T_boral_Fungi, T_boral_Aravo, T_boral_Mites)/2)
-result[6,2:8]= round(c(T_Hmsc_sim, T_Hmsc_Mosquitos, T_Hmsc_Eucalypts, T_Hmsc_Frogs, T_Hmsc_Fungi,
+result[, 1] <- c("n.obs", "n.param", "n.burnin", "n.sample", "n.thin", "sample.size",  rep(c("boral","Hmsc","jSDM"), 6), "")
+
+result[1, 2:8] <- nobs
+# n.param=n.sites*n.latent + n.species*(n.col.X + n.latent) -1 (constrained Lambda: lower triangular)
+# All interactions traits environment are considered and intercept included:
+# n.param <- n.param + n.col.X*(n.traits + 1) 
+result[2, 2:8] <- nparam
+result[3,2:8] <- 10000
+result[4,2:8] <- 10000
+result[5,2:8] <- 10
+result[6,2:8] <- 1000
+result[7,2:8] <- round(c(T_boral_sim, T_boral_Mosquitos, T_boral_Eucalypts, T_boral_Frogs, T_boral_Fungi, T_boral_Aravo, T_boral_Mites)/2)
+result[8,2:8]= round(c(T_Hmsc_sim, T_Hmsc_Mosquitos, T_Hmsc_Eucalypts, T_Hmsc_Frogs, T_Hmsc_Fungi,
              T_Hmsc_Aravo, T_Hmsc_Mites)/2)
-result[7,2:8]= round(c(T_jSDM_sim, T_jSDM_Mosquitos, T_jSDM_Eucalypts, T_jSDM_Frogs,T_jSDM_Fungi,
+result[9,2:8]= round(c(T_jSDM_sim, T_jSDM_Mosquitos, T_jSDM_Eucalypts, T_jSDM_Frogs,T_jSDM_Fungi,
              T_jSDM_Aravo, T_jSDM_Mites)/2)
 pkg <- c("boral", "Hmsc", "jSDM")
-l <- 7
+l <- 9
 for(p in 1:ncol(jSDM_neff)){
   for(n in 1:length(pkg)){
     result[n + l, 2:8] <- eval(parse(text=paste0(pkg[n], "_neff")), env=.GlobalEnv)[,p]
@@ -444,18 +674,18 @@ sp_pictures <- c("des.jpg",
                  "Frogs.jpg","Fungi.jpg",
                  "alpine_plants_.jpg",
                  "oribatid_mites_.png")
-result[23, 2:8] <- sprintf('\\includegraphics[height=1.4cm, width=1.4cm]{%s}', sp_pictures)
+result[25, 2:8] <- sprintf('\\includegraphics[height=1.4cm, width=1.4cm]{%s}', sp_pictures)
 
 kable(result, booktabs=TRUE, "latex", align=c('l', rep('r',7)), escape=FALSE) %>%
       row_spec(0, bold=TRUE, align='c') %>%
       column_spec(1, bold=TRUE, width="3.5cm") %>%
       #column_spec(2:8, width="1.5cm")  %>%
-      group_rows("T.sample (secondes)", 5, 7, escape=FALSE) %>%
-      group_rows("Species intercept: $\\beta_0$", 8, 10, escape=FALSE) %>%
-      group_rows("Species effects: $\\beta$", 11, 13, escape=FALSE) %>%
-      group_rows("Factor loadings: $\\lambda$", 14, 16, escape=FALSE) %>%
-      group_rows("Latent variables: $W$", 17, 19, escape=FALSE) %>%
-      group_rows("Total", 20, 22) %>%
+      group_rows("T.sample (secondes)", 7, 9, escape=FALSE) %>%
+      group_rows("Species intercept: $\\beta_0$", 10, 12, escape=FALSE) %>%
+      group_rows("Species effects: $\\beta$", 13, 15, escape=FALSE) %>%
+      group_rows("Factor loadings: $\\lambda$", 16, 18, escape=FALSE) %>%
+      group_rows("Latent variables: $W$", 19, 21, escape=FALSE) %>%
+      group_rows("Total", 22, 24) %>%
   kable_styling(latex_options=c("HOLD_position","striped","scale_down")) %>%
   kableExtra::save_kable(file="figures/neff.pdf")
 ```
@@ -464,214 +694,22 @@ kable(result, booktabs=TRUE, "latex", align=c('l', rep('r',7)), escape=FALSE) %>
 \begin{table}[H]
 \caption{The number of effective values sampled per second, by each package. The effective sample size (ESS), is computed for each parameter, using the function \href{https://www.rdocumentation.org/packages/coda/versions/0.19-4/topics/effectiveSize}{\texttt{effectiveSize}} from package \texttt{coda}. We assume that sampling time (T.sample) corresponds to half of the computation time (see Table ~\ref{tab:comparison-time-accuracy}) because the same number of sampling iterations (n.sample) and burn-in (n.burnin) iterations was performed to fit the models. To reduce the auto-correlation of the MCMCs, only one in n.thin of the sampling iterations was retained and a sample of size: sample.size, is returned for each parameter. To obtain de number of effective values sampled per second, in total or for the species intercept $\beta_0$, the species effect $\beta$, the factor loadings $\lambda$ and the latent variables $W$,  the sum of the ESSs computed for all parameters, or the average of ESSs for each kind of parameters, is divided by the sampling time in seconds.}
 
-```{r comparison-sampler-efficiency, echo=FALSE, include=TRUE, fig.show = "hold",fig.pos = "H", fig.align='center'}
+```{r comparison-sampler-efficiency, echo=FALSE, include=TRUE, fig.width=900, fig.show = "hold",fig.pos = "H", fig.align='center'}
 knitr::include_graphics("figures/neff.pdf")
 ```
 \label{tab:neff}
 \end{table}
 
 
-## Fitting JSDM including species traits 
+<!-- ## Selection of species with constrained factor loadings to improve LVM convergence  -->
 
-Analyzing response of alpine plants [@Choler2005] to snowmelt Date according to their SLA 
+<!-- As a first step, we use the [`jSDM_binomial_probit`](https://ecology.ghislainv.fr/jSDM/reference/jSDM_binomial_probit.html) function -->
+<!-- for fitting the JSDM in parallel from a simulated data-set, to obtain four MCMC chains of parameters. -->
+<!-- - Figure : trace and density lambda diags + Rhat to show convergence issues with arbitrarly chosen species -->
 
-## Selection of species with constrained factor loadings to improve LVM convergence 
+<!-- As a second step, we use the [`jSDM_binomial_probit_sp_constrained`](https://ecology.ghislainv.fr/jSDM/reference/jSDM_binomial_probit_sp_constrained.html) function for fitting the JSDM in parallel, to obtain four MCMC chains of parameters. At first, the function fit a JSDM with the constrained species arbitrarily chosen as the first ones in the presence-absence data-set. Then, the function evaluates the convergence of MCMC $\lambda$ chains using the Gelman-Rubin convergence diagnostic ($\hat{R}$). It identifies the species ($\hat{j}_l$) having the higher $\hat{R}$ for $\lambda_{\hat{j}_l}$. These species drive the structure of the latent axis $l$. The $\lambda$ corresponding to this species are constrained to be positive and placed on the diagonal of the $\Lambda$ matrix for fitting a second model. This usually improves the convergence of the latent variables and factor loadings.  -->
 
-As a first step, we use the [`jSDM_binomial_probit`](https://ecology.ghislainv.fr/jSDM/reference/jSDM_binomial_probit.html) function
-for fitting the JSDM in parallel from a simulated data-set, to obtain four MCMC chains of parameters.
-- Figure : trace and density lambda diags + Rhat to show convergence issues with arbitrarly chosen species
-
-As a second step, we use the [`jSDM_binomial_probit_sp_constrained`](https://ecology.ghislainv.fr/jSDM/reference/jSDM_binomial_probit_sp_constrained.html) function for fitting the JSDM in parallel, to obtain four MCMC chains of parameters. At first, the function fit a JSDM with the constrained species arbitrarily chosen as the first ones in the presence-absence data-set. Then, the function evaluates the convergence of MCMC $\lambda$ chains using the Gelman-Rubin convergence diagnostic ($\hat{R}$). It identifies the species ($\hat{j}_l$) having the higher $\hat{R}$ for $\lambda_{\hat{j}_l}$. These species drive the structure of the latent axis $l$. The $\lambda$ corresponding to this species are constrained to be positive and placed on the diagonal of the $\Lambda$ matrix for fitting a second model. This usually improves the convergence of the latent variables and factor loadings. 
-
-- Figure : trace and density lambda_jhat + Rhat, legend : The function returns the parameter posterior distributions for this second model. We represent the trace and density *a posteriori* of $\lambda_{\hat{j}_l}$ for each latent axis $l$. 
-
-## Inference of biodiversity maps in Madagascar from large forest inventories
-
-### Datasets 
-
-#### Forest inventory
-
-National forest inventories carried out on $753$ sites on the island of Madagascar are available, listing the presence or absence of $555$ plant species on each of these sites between 1994 and 1996.
-We use these forest inventories to calculate a matrix indicating the presence by a $1$ and the absence by a $0$ of the species at each site by removing observations for which the species is not identified. This matrix therefore records the occurrences of $483$ ($n_{sp}$) species at $751$ ($n_{site}$) sites.
-
-#### Current environmental variables
-
-Among the climatic and environmental data available on the site \url{https://madaclim.cirad.fr}, concerning the whole island of Madagascar at present (interpolations of representative observed data from the years 1960-1990), and with a resolution of 1km, we chose to use the following variables, because they have an ecological meaning which makes them easily interpretable and are little correlated between them, according to the article @Vieilledent2013 : 
-
-```{r clim-variables, echo=FALSE}
-results <- data.frame(variable=c("temp","prec","sais.temp","sais.prec","cwd"), description=c("the average annual temperature ($^\\circ C\\times 10$)", "the average annual precipitation (mm).", "the seasonality of temperatures corresponds to the standard deviation of monthly temperatures multiplied by 100.", "the seasonality of precipitation as a coefficient of variation.", "the annual climatic water deficit (mm) is based on monthly precipitation ($prec$) and potential evapotranspiration ($pet$) which is defined as the amount of evaporation that would occur in a month if a sufficient water source were available: $\\mathrm{cwd}=\\sum_{m=1}^{12}\\min(0,\\mathrm{prec}_m-\\mathrm{pet}_m)$.")) 
-
-knitr::kable(results, "latex", row.names=F, booktabs=TRUE, align = 'l', escape=FALSE, caption="Climatic variables") %>%
-  column_spec(1, bold=TRUE) %>%
-  column_spec(2, width="8cm") %>%
-  kableExtra::kable_styling(latex_options=c("HOLD_position","striped"), full_width=FALSE)
-```
-
-We consider also the quadratic effects of these climate variables to perform a quadratic regression, which is more suitable for fitting a niche model than a linear regression. The values of these climate variables, on the coordinates of the inventory plots, are extracted, scaled and centered. The resulting data-set is used as explanatory variables for fitting the JSDM. 
-
-### Fitting joint species distribution model (JSDM) 
-
-#### Model definition
-
-We use the latent variable model (LVM) defined previously to account for species co-occurrence on all sites :
-
-$$ \mathrm{probit}(\theta_{ij}) =\alpha_i + \beta_{0j}+X_i.\beta_j+ W_i.\lambda_j $$
-
-It can be easily shown that the response variable $y_{ij} \sim \mathcal{B}ernoulli(\theta_{ij})$ by defining the latent variable :  
-$z_{ij} = \alpha_i + \beta_{0j} + X_i.\beta_j + W_i.\lambda_j + \epsilon_{i,j}$, with $\forall (i,j) \ \epsilon_{ij} \sim \mathcal{N}(0,1)$, such that:
-
-$$y_{ij}=\begin{cases}
-1 & \text{if} \ z_{ij} > 0 \\
-0 &  \text{otherwise.}
-\end{cases}$$
-
-- Latent variables: $W_i=(W_i^1,\ldots,W_i^q)$ where $q$ is the number of latent variables considered, which has to be fixed by the user (in this case $q=2$).
-We assume that $W_i \sim \mathcal{N}(0,I_q)$ and we define the associated coefficients  $\lambda_j=(\lambda_j^1,\ldots, \lambda_j^q)'$, also known as "factor loadings" [@Warton2015]. We use a prior distribution $\mathcal{N}(0,1)$ for all lambda not concerned by constraints to $0$ on upper diagonal and to strictly positive values on diagonal. 
-
-- Explanatory variables: bioclimatic data about each site and their quadratic effects. $X=(X_i)_{i=1,\ldots,n_{site}}$ with $X_i=(\mathrm{temp}_i, \mathrm{prec}_i, \mathrm{sais.temp}_i, \mathrm{sais.prec}_i, \mathrm{cwd}_i, \mathrm{temp}_i^2, \mathrm{prec}_i^2, \mathrm{sais.temp}_i^2, \mathrm{sais.prec}_i^2, \mathrm{cwd}_i^2)\in \mathbb{R}^p$ where $p=10$ is the number of variables considered.
-The corresponding regression coefficients for each species $j$ are noted : $\beta_j=(\beta_j^1,\ldots,\beta_j^p)'$. We use a prior distribution $\mathcal{N}(0,1)$ for all beta.  
-
-- $\beta_{0j}$ corresponds to the intercept for species $j$ which is assumed to be a fixed effect. We use a prior distribution $\mathcal{N}(0,10)$ and define the prevalence of species $j$ ($p_j=\sum\limits_{i=1}^{n_{site}}\frac{y_{ij}}{n_{site}}$) as starting values for the species intercept to improve the estimation of this parameter.
-
-- $\alpha_i$ represents the random effect of site $i$ such as $\alpha_i \sim \mathcal{N}(0,V_{\alpha})$ and we assume that $V_{\alpha} \sim \mathcal {IG}(\text{shape}=0.1, \text{rate}=0.1)$ as prior distribution by default. 
-
-#### Parameters inference
-
-We fit a binomial joint species distribution model, including two latent variables and a random site effect using the `jSDM_binomial_probit()` function to perform binomial probit regression considering all the species from the data described above, by performing $80 000$ iterations including $40 000$ of burn-in and we retain $N_{samp}=1 000$ values for each parameter of the model.
-
-```{r fit-JSDM-Mada-table, echo=FALSE, include=TRUE}
-load("~/Documents/projet_BioSceneMada/Report/Internship Report/data/mada_mod.RData")
-nsp<-ncol(mod_all$model_spec$presence_data)
-nplot<-nrow(mod_all$model_spec$presence_data)
-p <- nrow(mod_all$model_spec$beta_start)
-n_latent <- mod_all$model_spec$n_latent
-T_all <- as.numeric(T_all,units="hours")
-results <- data.frame(nsp,nplot,n_obs=nsp*nplot, 
-                      n_param=(p+n_latent)*nsp-1 + nplot*(n_latent+1) + 1,
-                      ngibbs="80000","Time"= T_all, dev=mean(mod_all$mcmc.Deviance))
-colnames(results)<- c("Number of species", "Number of sites", "Number of observations","Number of estimated parameters", "Iterations performed","Computation time (hours)","Deviance")
-knitr::kable(results, "latex", row.names=F, digits=1, booktabs=TRUE, align = 'c',
-             caption="Compuation time for fitting JSDM from Madagascar data-sets and deviance obtained") %>%
-    column_spec(1:9, width="1.9cm") %>%
-		kableExtra::kable_styling(latex_options=c("HOLD_position","striped"), full_width=FALSE)
-```
-
-<!-- ```{r fit-JSDM-Mada-table, echo=FALSE, include=TRUE} -->
-<!-- load("~/Documents/projet_BioSceneMada/Report/data/mada_mod.RData") -->
-<!-- nsp <- ncol(mod_all$model_spec$presence_data) -->
-<!-- nplot <- nrow(mod_all$model_spec$presence_data) -->
-<!-- p <- nrow(mod_all$model_spec$beta_start) -->
-<!-- n_latent <- mod_all$model_spec$n_latent -->
-<!-- T_all <- as.numeric(T_all,units="mins") -->
-<!-- # Accuracy  -->
-<!-- # Compute the proportion of species predicted as present  -->
-<!-- # among the species  observed at each site for the different data-sets. -->
-<!-- Sensitivity <- function(PA, theta){ -->
-<!--   n_sites <- nrow(PA) -->
-<!--   score <- 0 -->
-<!--   for(i in 1:n_sites){ -->
-<!--     # Sensitivity  -->
-<!--     obs_sp <- which(PA[i,]>0) -->
-<!--     nobs_sp <- length(obs_sp) -->
-<!--     pred_sp <- which(theta[i,] >= sort(theta[i,], decreasing = TRUE)[nobs_sp]) -->
-<!--     score <- score + sum(pred_sp %in% obs_sp)/ifelse(nobs_sp!=0, nobs_sp,1) -->
-<!--   } -->
-<!--   return(score/n_sites) -->
-<!-- } -->
-<!-- sensitivity <- Sensitivity(mod_all$model_spec$presence_data, mod_all$theta_latent) -->
-<!-- Specificity  <- function(PA, theta){ -->
-<!--   n_sites <- nrow(PA) -->
-<!--   score <- 0 -->
-<!--   for(i in 1:n_sites){ -->
-<!--     # Specificity  -->
-<!--     abs_sp <- which(PA[i,]==0) -->
-<!--     nabs_sp <- length(abs_sp) -->
-<!--     pred_abs_sp <- which(theta[i,] <= sort(theta[i,])[nabs_sp]) -->
-<!--     score <- score + sum(pred_abs_sp %in% abs_sp)/ifelse(nabs_sp!=0, nabs_sp, 1) -->
-<!--   } -->
-<!--   return(score/n_sites) -->
-<!-- } -->
-<!-- specificity <- Specificity(mod_all$model_spec$presence_data, mod_all$theta_latent) -->
-<!-- results <- data.frame(nsp,nplot,n_obs=nsp*nplot, n.col.X=p, n.latent=n_latent, -->
-<!--                       n_param=(p+n_latent)*nsp-1 + nplot*(n_latent+1) + 1, -->
-<!--                       ngibbs="80000", dev=round(mean(mod_all$mcmc.Deviance)), TSS=sensitivity+specificity-1, "Time"= round(T_all)) -->
-<!-- colnames(results)<- c("n.species", "n.sites", "n.obs", "n.col.X", "n.latent", "n.param", "n.mcmc", "Deviance", "TSS", "Computation time (min)") -->
-<!-- knitr::kable(results, "latex", row.names=F, digits=1, booktabs=TRUE, align = 'c') %>% -->
-<!--     row_spec(0, bold=TRUE) %>% -->
-<!--     column_spec(10, width="2cm") %>% -->
-<!-- 		kableExtra::kable_styling(latex_options=c("HOLD_position","striped","scale_down"), full_width=FALSE) %>% -->
-<!--     kableExtra::save_kable(file="figures/JSDM_Mada_poster.pdf", density=600) -->
-<!-- ``` -->
-
-#### Evaluation of MCMC convergence 
-
-multiple chains Rhat  ?
-
-### Predictive performance of the model  
-
-compute AUC, Rprecision on inventory sites to assess the predictive performance of the model ?
-
-### Estimated species-species associations
-
-After fitting the JSDM with latent variables, the **full species residual correlation matrix** $R=(R_{ij})^{i=1,\ldots, n_{site}}_{j=1,\ldots, n_{species}}$ can be derived from the covariance in the latent variables such as : 
- $$\Sigma_{ij} = \lambda_i .\lambda_j^T$$, then we compute correlations from covariances :
-  $$R_{i,j} = \frac{\Sigma_{ij}}{\sqrt{\Sigma _{ii}\Sigma _{jj}}}$$.
-  
-```{r plot-associations, echo=FALSE, fig.show = "hold",fig.pos = "H", fig.align='center', out.width="40%", eval=TRUE, fig.cap="Representation of the top 100 estimated residual correlations between species, based on their number of observed occurrences and environmental preferences.", fig.subcap=c("The top 100 residual correlations between species, with the 483 species sorted according to the number of sites where they occur out of the 751 inventoried.","The top 100 residual correlations between species, with the species sorted according to their largest environmental coefficients ($\\beta$) (the outer ring shows the distribution of environmental effect for species within the sample.)")}
-knitr::include_graphics("Application/Madagascar_files/figure-html/plot-associations-1.png")
-knitr::include_graphics("Application/Madagascar_files/figure-html/plot-associations-2.png")
-```
-
-The figure \@ref(fig:plot-associations), inspired by the article @Pichler2021, allows us to observe the positive or negative residual correlations between species which can be interpreted in terms of positive or negative influence of the presence of a species on the probability of occurrence of another.
-
-- main correlation more between abundant species 
-- correlation between species whith main env effect cwd and sais_prec 
-
-
-### Interpolation of parameters between inventory sites 
-
-The presence of a spatial structure where observations close to each other are more similar than those far away (spatial auto-correlation) is a prerequisite for the application of geostatistics and according to the spatial representations in supplementary, it seems to be satisfied.  
-
-Thus, we can to interpolate sites' parameters ($\alpha$ and $W$) for the whole island from those estimated for the inventory plots, using the spatial interpolation method called regularized spline with tension (**RST**) from [`GRASS GIS`](https://grass.osgeo.org/) software via `rgrass7` R package. This method is described in the article [@Mitasova1993]. We then calculate species occurrence probabilities between inventory sites using interpolated site parameters. 
-
-### Estimated species richness 
-
-Species richness, also known as $\alpha$-diversity, reflects the number of species coexisting in a given environment and is calculated by summing the number of species present at each site.  
-
-(ref:cap-sprich) Representation of species richness at inventory sites.
-
-(ref:sprich-ref) @Scherrer2020
-
-```{r species-richness-representation, echo=FALSE, fig.show = "hold",fig.pos = "H", out.width = "50%", fig.align = "center", fig.ncol = 2, eval=TRUE, fig.subcap=c('Spatial representation of the species richness observed at each inventory site $i$ defined by $R_i=\\sum\\limits_ {j=1}^{n_{sp}} y_{ij}$.', 'Spatial representation of the species richness estimated, following (ref:sprich-ref), by summing the estimated occurrence probabilities of all species on each inventory site: $\\widehat{R}_i=\\sum\\limits_{j=1}^{n_{sp}} \\widehat{\\theta}_{ij}$.', 'Estimated species richness according to the observed one.'), fig.cap="(ref:cap-sprich)"}
-knitr::include_graphics(c("Application/Madagascar_files/figure-html/species-richness-representation-2.png","Application/Madagascar_files/figure-html/species-richness-representation-1.png"))
-knitr::include_graphics("Application/Madagascar_files/figure-html/species-richness-representation-3.png")
-```
-
-We can see on figures \@ref(fig:species-richness-representation).a and \@ref(fig:species-richness-representation).b that the observed species richness is greater in the moist forest of the north-east of the island, particularly in the Masoala peninsula. Moreover, it can be seen on figure \@ref(fig:species-richness-representation).c that the observed species richness on the inventory sites corresponds fairly well to that estimated.
-
-
-(ref:cap-sprich-deforest) Estimated species richness at the Madagascar scale by summing interpolated occurrence probabilities (left) and estimated species richness in Madagascar restricted to remaining forest cover in 2000 from the article @Vieilledent2018, to account for deforestation on the island (right). 
-
-```{r plot-species-richness-deforest, echo=FALSE, eval=TRUE, fig.show = "hold", fig.pos = "H", out.height = "30%", fig.align = "center", fig.cap="(ref:cap-sprich-deforest)"}
-knitr::include_graphics("Application/Madagascar_files/figure-html/plot-species-richness-deforest-2.png")
-```
-
-We can see on figure \@ref(fig:plot-species-richness-deforest) that the species richness, computed from interpolated occurrence probabilities, is greater in the moist forest of the north-east of the island, particularly in the Masoala peninsula as expected given the observed species richness on inventory sites. It can be explained by the fact that this area is located close to the Equator and is receiving the highest level of precipitation in Madagascar. As a consequence, this area benefits from high levels of resources (light and water) and is characterized by a low environmental stress and a long growing season [@Vieilledent2013]. Note that the estimated species richness does not necessarily stand for a 'true' number of present species but represent a relative species richness between sites (one site is richer in species than another site).
-
-### Estimated species turnover at Madagascar scale
-
-Species turnover, also known as $\beta$-diversity, is a measure of biodiversity that compares the diversity of species between ecosystems or along environmental gradients, using the number of taxa that are unique to each ecosystem.  
-
-(ref:cap-forest-type) Forest types in Madagascar from the article @Vieilledent2018.
-
-(ref:cap-div-beta) Estimated species turnover at the Madagascar scale (left) and estimated species turnover in Madagascar restricted to remaining forest cover in 2000 from the article @Vieilledent2018, to account for deforestation on the island (right). To obtain these maps, we perform a standard PCA on the species occurrence probabilities, interpolated for each pixel, referring to the article @Allnutt2008. The coordinates obtained for the first three PCA's axes, that reflect the composition of the species community likely to occupy the corresponding pixel, are scaled $ [0,255] $ to be represented by red, green and blue color levels. The combination of these three color levels determines the coloring of each pixel in the displayed $ \beta $-diversity map. Therefore, a color difference between two pixels indicates that the species present are not the same, while pixels of identical color host communities of similar species.
-
-```{r diversity-beta, echo=FALSE, fig.show = "hold", fig.pos = "H", out.height=c("30%","27%"), fig.col=1, fig.align = "center",  eval=TRUE, fig.cap="Estimated species turnover and forest types in Madagascar.", fig.subcap=c("(ref:cap-div-beta)","(ref:cap-forest-type)")}
-knitr::include_graphics("Application/Madagascar_files/figure-html/plot-diversity-beta-1.png") 
-knitr::include_graphics("Application/Madagascar_files/figure-html/mada_forest_type.jpg")
-```
-
-We can see that the estimated map of $\beta$-diversity on the figure \@ref(fig: diversity-beta).a agrees with the map of Madagascar’s forest types from the article @Vieilledent2018 on figure  \@ref(fig: diversity-beta).b. Indeed, communities of species represented by shades of blue and green correspond to the eastern moist forest, communities represented by shades of red match the western dry forest and communities in magenta correspond to the southern spiny forest. Moreover, the $\beta$-diversity map we obtain allows to identify substantially different species communities within these three forest types. For example, we can clearly identify three different tree communities (in blue, green, and black) within the eastern moist forest.
+<!-- - Figure : trace and density lambda_jhat + Rhat, legend : The function returns the parameter posterior distributions for this second model. We represent the trace and density *a posteriori* of $\lambda_{\hat{j}_l}$ for each latent axis $l$.  -->
 
 # Discussion
 ## Other software comparison

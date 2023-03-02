@@ -16,7 +16,7 @@ Binomial( probit);0;0;1;0;0;0;0;1
 Binomial (logit);1;0;0;0;0;0;0;1
 Poisson (log);1;1;1;1;0;0;1;1
 Neg.Bin (log);0;0;1;0;0;0;1;1
-Normal (identity);0;1;1;1;1;0;1;1
+Normal (identity);1;1;1;1;1;0;1;1
 None;1;1;1;1;0;1;1;1
 Fixed;1;0;1;0;0;0;1;1
 Random;1;1;1;0;1;0;1;1
